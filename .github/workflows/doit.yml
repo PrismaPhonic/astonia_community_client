@@ -3,7 +3,7 @@ name: Compile and Package Client
 on:
   push:
     tags:
-      - '*'
+      - "*"
 
 jobs:
   do-it:
@@ -13,16 +13,15 @@ jobs:
       run:
         shell: msys2 {0}
     steps:
-    - uses: actions/checkout@v3
-      with:
-        lfs: true
-    - uses: msys2/setup-msys2@v2
-      with:
-        install: mingw-w64-x86_64-gcc mingw-w64-x86_64-SDL2 mingw-w64-x86_64-libpng mingw-w64-x86_64-SDL2_mixer mingw-w64-x86_64-libzip mingw64/mingw-w64-x86_64-dwarfstack make zip
-    - run: make CC=gcc
-    - run: make distrib
-    - uses: softprops/action-gh-release@v1
-      with:
-        files: windows_client.zip
-
-
+      - uses: actions/checkout@v3
+        with:
+          lfs: true
+      - uses: msys2/setup-msys2@v2
+        with:
+          install: mingw-w64-clang-x86_64-clang mingw-w64-clang-x86_64-SDL2 mingw-w64-clang-x86_64-libpng mingw-w64-clang-x86_64-SDL2_mixer mingw-w64-clang-x86_64-libzip mingw-w64-clang-x86_64-dwarfstack make zip ming mingw-w64-clang-x86_64-rustup
+      - run: rustup target add x86_64-pc-windows-gnullvm
+      - run: make CC=clang
+      - run: make distrib
+      - uses: softprops/action-gh-release@v1
+        with:
+          files: windows_client.zip
