@@ -1,16 +1,49 @@
-all: bin/moac
+all: bin/moac bin/amod.dylib
 
 SDL_CONFIG=sdl2-config
 CC=clang
 OPT=-O3
 DEBUG=-gdwarf-4
+PKG_CONFIG?=pkg-config
+BREW_PREFIX:=$(shell brew --prefix 2>/dev/null)
+
+ZIP_CFLAGS:=$(shell $(PKG_CONFIG) --cflags libzip 2>/dev/null)
+ZIP_LIBS:=$(shell $(PKG_CONFIG) --libs libzip 2>/dev/null)
+ifeq ($(ZIP_CFLAGS),)
+    ifneq ($(BREW_PREFIX),)
+        ZIP_CFLAGS:=-I$(BREW_PREFIX)/include
+    endif
+endif
+ifeq ($(ZIP_LIBS),)
+    ifneq ($(BREW_PREFIX),)
+        ZIP_LIBS:=-L$(BREW_PREFIX)/lib -lzip
+    else
+        ZIP_LIBS:=-lzip
+    endif
+endif
+
+SDL_MIXER_CFLAGS:=$(shell $(PKG_CONFIG) --cflags SDL2_mixer 2>/dev/null)
+SDL_MIXER_LIBS:=$(shell $(PKG_CONFIG) --libs SDL2_mixer 2>/dev/null)
+ifeq ($(SDL_MIXER_CFLAGS),)
+    ifneq ($(BREW_PREFIX),)
+        SDL_MIXER_CFLAGS:=-I$(BREW_PREFIX)/include
+    endif
+endif
+ifeq ($(SDL_MIXER_LIBS),)
+    ifneq ($(BREW_PREFIX),)
+        SDL_MIXER_LIBS:=-L$(BREW_PREFIX)/lib -lSDL2_mixer
+    else
+        SDL_MIXER_LIBS:=-lSDL2_mixer
+    endif
+endif
+
 SDL_CFLAGS=$(shell $(SDL_CONFIG) --cflags)
-CFLAGS=$(OPT) $(DEBUG) -Wall -Wno-pointer-sign -Wno-char-subscripts -fno-omit-frame-pointer -fvisibility=hidden $(SDL_CFLAGS) -Iinclude -Isrc
-CFLAGS_PIC=$(OPT) $(DEBUG) -Wall -Wno-pointer-sign -Wno-char-subscripts -fPIC -fno-omit-frame-pointer -fvisibility=hidden $(SDL_CFLAGS) -Iinclude -Isrc
+CFLAGS=$(OPT) $(DEBUG) -Wall -Wno-pointer-sign -Wno-char-subscripts -fno-omit-frame-pointer -fvisibility=hidden $(SDL_CFLAGS) $(SDL_MIXER_CFLAGS) -Iinclude -Isrc $(ZIP_CFLAGS)
+CFLAGS_PIC=$(OPT) $(DEBUG) -Wall -Wno-pointer-sign -Wno-char-subscripts -fPIC -fno-omit-frame-pointer -fvisibility=hidden $(SDL_CFLAGS) $(SDL_MIXER_CFLAGS) -Iinclude -Isrc $(ZIP_CFLAGS)
 LDFLAGS=$(OPT) $(DEBUG) -rdynamic -Wl,-rpath,@loader_path
 
 SDL_LIBS=$(shell $(SDL_CONFIG) --libs)
-LIBS = -lz -lpng -lzip $(SDL_LIBS) -lSDL2_mixer -lm
+LIBS = -lz -lpng $(ZIP_LIBS) $(SDL_MIXER_LIBS) -lm
 
 ASTONIA_NET_DIR=astonia_net
 # Detect macOS architecture
@@ -38,7 +71,7 @@ $(ASTONIA_NET_LIB):
 		cargo build --release --manifest-path $(ASTONIA_NET_DIR)/Cargo.toml --target $(ASTONIA_NET_TGT)
 
 bin/amod.dylib:	src/amod/amod.o bin/moac
-		$(CC) $(LDFLAGS) -dynamiclib -o bin/amod.dylib src/amod/amod.o
+		$(CC) $(LDFLAGS) -dynamiclib -undefined dynamic_lookup -o bin/amod.dylib src/amod/amod.o
 
 src/amod/amod.o:	src/amod/amod.c src/amod/amod.h src/amod/amod_structs.h
 
@@ -46,7 +79,7 @@ bin/anicopy:	src/helper/anicopy.c
 		$(CC) $(OPT) $(DEBUG) -Wall -o bin/anicopy src/helper/anicopy.c
 
 bin/convert:	src/helper/convert.c
-		$(CC) $(OPT) $(DEBUG) -Wall -DSTANDALONE -o bin/convert src/helper/convert.c -lpng -lzip
+		$(CC) $(OPT) $(DEBUG) -Wall -DSTANDALONE $(ZIP_CFLAGS) -o bin/convert src/helper/convert.c -lpng $(ZIP_LIBS)
 
 
 src/client/client.o:	src/client/client.c src/astonia.h src/client.h src/client/_client.h src/sdl.h
@@ -82,9 +115,10 @@ src/game/memory_macos.o: src/game/memory_macos.c
 
 clean:
 		-rm -f src/*/*.o bin/moac bin/*.dylib bin/convert bin/anicopy
+		-rm -rf bin/*.dSYM
 
 distrib:
-	tar czf macos_client.tar.gz bin res
+	tar czf macos_client.tar.gz --exclude='bin/*.dSYM' bin res
 
 amod:		bin/amod.dylib bin/moac
 convert:	bin/convert

@@ -36,14 +36,14 @@ linux:
 
 macos:
 	@echo "Building for macOS..."
-	@$(MAKE) -f build/make/Makefile.osx
+	@$(MAKE) -f build/make/Makefile.macos
 
 # Clean for all platforms
 clean:
 	@echo "Cleaning all platforms..."
 	@$(MAKE) -f build/make/Makefile.windows clean 2>/dev/null || true
 	@$(MAKE) -f build/make/Makefile.linux clean 2>/dev/null || true
-	@$(MAKE) -f build/make/Makefile.osx clean 2>/dev/null || true
+	@$(MAKE) -f build/make/Makefile.macos clean 2>/dev/null || true
 
 # Distribution target (delegates to platform-specific Makefile)
 distrib:
