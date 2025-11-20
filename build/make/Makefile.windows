@@ -16,7 +16,7 @@ SDL_LIBS=$(shell $(SDL_CONFIG) --libs)
 LIBS = -lwsock32 -lws2_32 -lz -lpng -lzip -ldwarfstack $(SDL_LIBS) -lSDL2_mixer
 
 ASTONIA_NET_DIR=astonia_net
-ASTONIA_NET_TGT=x86_64-pc-windows-gnu
+ASTONIA_NET_TGT=x86_64-pc-windows-gnullvm
 ASTONIA_NET_LIB=$(ASTONIA_NET_DIR)/target/$(ASTONIA_NET_TGT)/release/libastonia_net.dll.a
 
 OBJS	=		src/gui/gui.o src/client/client.o src/client/skill.o src/game/dd.o src/game/font.o\

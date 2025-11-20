@@ -454,7 +454,7 @@ fn rustTripleFor(t: std.Target) []const u8 {
     return switch (t.cpu.arch) {
         .x86_64 => switch (t.os.tag) {
             .linux => "x86_64-unknown-linux-gnu",
-            .windows => "x86_64-pc-windows-gnu",
+            .windows => "x86_64-pc-windows-gnullvm",
             .macos => "x86_64-apple-darwin",
             else => @panic("unsupported OS for x86_64"),
         },
