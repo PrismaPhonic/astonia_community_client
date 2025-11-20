@@ -28,6 +28,7 @@ jobs:
         uses: msys2/setup-msys2@v2
         with:
           msystem: clang64
+          path-type: inherit
           update: true
           install: >
             mingw-w64-clang-x86_64-clang
@@ -42,6 +43,7 @@ jobs:
       - name: Build
         shell: msys2 {0}
         run: |
+          which cargo || echo "cargo not found in PATH"
           make CC=clang
           make distrib
 
