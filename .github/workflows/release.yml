@@ -46,8 +46,6 @@ jobs:
       run: |
         strip bin/moac
         strip bin/libastonia_net.so
-        strip bin/convert
-        strip bin/anicopy
 
     - name: Create distribution package
       run: make distrib
@@ -74,6 +72,7 @@ jobs:
           lfs: true
 
       - name: Checkout LFS objects
+        shell: bash
         run: git lfs pull
 
       - name: Install Rust toolchain (GNU variant)
@@ -106,8 +105,6 @@ jobs:
         run: |
           strip bin/moac.exe
           strip bin/astonia_net.dll
-          strip bin/convert.exe
-          strip bin/anicopy.exe
 
       - name: Create distribution package
         run: make distrib
@@ -151,9 +148,7 @@ jobs:
     - name: Strip debug symbols
       run: |
         strip bin/moac
-        strip bin/libastonia_net.dylib
-        strip bin/convert
-        strip bin/anicopy
+        strip -x bin/libastonia_net.dylib
 
     - name: Create distribution package
       run: make distrib
