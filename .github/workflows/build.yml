@@ -15,11 +15,6 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      with:
-        lfs: true
-
-    - name: Checkout LFS objects
-      run: git lfs pull
 
     - name: Install dependencies
       run: |
@@ -58,99 +53,55 @@ jobs:
   build-windows:
     name: Build Windows
     runs-on: windows-latest
-    timeout-minutes: 20
-
+    timeout-minutes: 10
     defaults:
       run:
         shell: msys2 {0}
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        lfs: true
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Setup MSYS2
-      uses: msys2/setup-msys2@v2
-      with:
-        msystem: CLANG64
-        update: true
-        install: >-
-          mingw-w64-clang-x86_64-clang
-          mingw-w64-clang-x86_64-SDL2
-          mingw-w64-clang-x86_64-SDL2_mixer
-          mingw-w64-clang-x86_64-libpng
-          mingw-w64-clang-x86_64-libzip
-          mingw-w64-clang-x86_64-dwarfstack
-          make
-          zip
+      - name: Install Rust toolchain (GNU variant)
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable-x86_64-pc-windows-gnu
+          cache: true
+          cache-workspaces: astonia_net
 
-    - name: Setup Rust
-      uses: actions-rust-lang/setup-rust-toolchain@v1
-      with:
-        toolchain: stable
-        target: x86_64-pc-windows-gnu
-        cache: true
-        cache-workspaces: astonia_net
+      - name: Setup MSYS2 (clang64)
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: clang64
+          path-type: inherit
+          update: true
+          install: >
+            mingw-w64-clang-x86_64-clang
+            mingw-w64-clang-x86_64-SDL2
+            mingw-w64-clang-x86_64-libpng
+            mingw-w64-clang-x86_64-SDL2_mixer
+            mingw-w64-clang-x86_64-libzip
+            mingw-w64-clang-x86_64-dwarfstack
+            make
+            zip
 
-    - name: Add Rust to PATH
-      run: echo "$USERPROFILE/.cargo/bin" >> $GITHUB_PATH
+      - name: Build
+        run: make CC=clang windows
 
-    - name: Build
-      run: make windows
+      - name: Copy DLL to bin
+        run: cp astonia_net/target/x86_64-pc-windows-gnu/release/astonia_net.dll bin/
 
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: windows-build
-        path: |
-          bin/moac.exe
-          bin/astonia_net.dll
-          bin/convert.exe
-          bin/anicopy.exe
-        retention-days: 30
-        if-no-files-found: error
-
-  build-macos-intel:
-    name: Build macOS (Intel)
-    runs-on: macos-13
-    timeout-minutes: 20
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        lfs: true
-
-    - name: Checkout LFS objects
-      run: git lfs pull
-
-    - name: Install dependencies
-      run: |
-        brew install sdl2 sdl2_mixer libpng libzip zlib
-
-    - name: Setup Rust
-      uses: actions-rust-lang/setup-rust-toolchain@v1
-      with:
-        toolchain: stable
-        target: x86_64-apple-darwin
-        cache: true
-        cache-workspaces: astonia_net
-
-    - name: Build
-      run: make macos
-
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: macos-intel-build
-        path: |
-          bin/moac
-          bin/libastonia_net.dylib
-          bin/convert
-          bin/anicopy
-        retention-days: 30
-        if-no-files-found: error
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build
+          path: |
+            bin/moac.exe
+            bin/astonia_net.dll
+            bin/convert.exe
+            bin/anicopy.exe
+          retention-days: 30
+          if-no-files-found: error
 
   build-macos-arm:
     name: Build macOS (Apple Silicon)
@@ -160,11 +111,6 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      with:
-        lfs: true
-
-    - name: Checkout LFS objects
-      run: git lfs pull
 
     - name: Install dependencies
       run: |
