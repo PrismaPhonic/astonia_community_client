@@ -17,11 +17,10 @@ jobs:
         with:
           lfs: true
 
-      - name: Install Rust toolchain and target
+      - name: Install Rust toolchain (GNU variant)
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
-          target: x86_64-pc-windows-msvc
+          toolchain: stable-x86_64-pc-windows-gnu
           override: true
 
       - name: Setup MSYS2 (clang64)

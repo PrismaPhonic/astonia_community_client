@@ -2,8 +2,12 @@ const std = @import("std");
 const builtin = @import("builtin");
 
 pub fn build(b: *std.Build) void {
+    // Get standard target options
     const resolved = b.standardTargetOptions(.{});
     const tgt = resolved.result;
+
+    // Note: Zig build uses MSVC ABI and requires Visual Studio C++ Build Tools
+    // The standard Makefile build uses GNU ABI and works without Visual Studio
 
     const host = builtin.target;
     const optimize = b.standardOptimizeOption(.{});
@@ -270,6 +274,7 @@ pub fn build(b: *std.Build) void {
     }
 
     // Helper tools (anicopy, convert) are built via Makefile instead of Zig
+    // They have ABI compatibility issues when built with Zig on Windows
 
     const run = b.addRunArtifact(exe);
     if (b.args) |args| run.addArgs(args);

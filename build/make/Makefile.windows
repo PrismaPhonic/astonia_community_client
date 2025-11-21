@@ -1,12 +1,38 @@
 all: bin/moac.exe
 
-# Ensure we use CLANG64 environment on Windows/MSYS2
-# This prevents accidentally using mingw64/gcc headers when clang64 is intended
-ifeq ($(MSYSTEM),CLANG64)
-    SDL_CONFIG=$(MSYSTEM_PREFIX)/bin/sdl2-config
-    export PKG_CONFIG_PATH := $(MSYSTEM_PREFIX)/lib/pkgconfig:$(MSYSTEM_PREFIX)/share/pkgconfig
+# Ensure we use CLANG64 libraries on Windows
+# This prevents accidentally using mingw64/gcc libraries when both are installed
+# Works in MSYS2 shells, CMD, and PowerShell
+
+# Detect CLANG64 prefix in order of likelihood:
+# 1. MSYS2 environment variable (set in MSYS2 shells)
+# 2. Standard MSYS2 installation path C:/msys64/clang64
+# 3. MSYS2 path from within MSYS2 shell: /clang64
+# 4. Custom path via CLANG64_PREFIX environment variable
+
+ifndef CLANG64_PREFIX
+    ifneq ($(MSYSTEM_PREFIX),)
+        # In MSYS2 shell, use MSYSTEM_PREFIX
+        CLANG64_PREFIX := $(MSYSTEM_PREFIX)
+    else ifeq ($(wildcard C:/msys64/clang64/bin/sdl2-config),C:/msys64/clang64/bin/sdl2-config)
+        # Standard MSYS2 installation (CMD/PowerShell)
+        CLANG64_PREFIX := C:/msys64/clang64
+    else ifeq ($(wildcard /clang64/bin/sdl2-config),/clang64/bin/sdl2-config)
+        # MSYS2 path from within a different MSYS2 shell
+        CLANG64_PREFIX := /clang64
+    endif
+endif
+
+# Configure build to use CLANG64 libraries explicitly
+ifneq ($(CLANG64_PREFIX),)
+    SDL_CONFIG := $(CLANG64_PREFIX)/bin/sdl2-config
+    export PKG_CONFIG_PATH := $(CLANG64_PREFIX)/lib/pkgconfig:$(CLANG64_PREFIX)/share/pkgconfig
+    export PATH := $(CLANG64_PREFIX)/bin:$(PATH)
+    $(info Using CLANG64 libraries from: $(CLANG64_PREFIX))
 else
-    SDL_CONFIG=sdl2-config
+    SDL_CONFIG := sdl2-config
+    $(warning WARNING: Could not detect CLANG64 installation. Build may fail or use wrong libraries.)
+    $(warning Set CLANG64_PREFIX environment variable to your clang64 installation path if needed.)
 endif
 WINDRES=windres
 LDD=ldd
@@ -23,8 +49,8 @@ SDL_LIBS=$(shell $(SDL_CONFIG) --libs)
 LIBS = -lwsock32 -lws2_32 -lz -lpng -lzip -ldwarfstack $(SDL_LIBS) -lSDL2_mixer
 
 ASTONIA_NET_DIR=astonia_net
-ASTONIA_NET_TGT=x86_64-pc-windows-msvc
-ASTONIA_NET_LIB=$(ASTONIA_NET_DIR)/target/$(ASTONIA_NET_TGT)/release/astonia_net.dll.lib
+ASTONIA_NET_TGT=x86_64-pc-windows-gnu
+ASTONIA_NET_LIB=$(ASTONIA_NET_DIR)/target/$(ASTONIA_NET_TGT)/release/libastonia_net.dll.a
 
 OBJS	=		src/gui/gui.o src/client/client.o src/client/skill.o src/game/dd.o src/game/font.o\
 			src/game/main.o src/game/sprite.o src/game/game.o src/modder/modder.o\
