@@ -563,7 +563,8 @@ int parse_cmd(char *s) {
                 frames_per_second=strtol(s,&end,10);
                 s=end;
             } else if (tolower(*s)=='t') { // -t server port
-                s++;
+                s++;
+
                 while (isspace(*s)) s++;
                 server_port=strtol(s,&end,10);
                 s=end;

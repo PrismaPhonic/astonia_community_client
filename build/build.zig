@@ -2,17 +2,10 @@ const std = @import("std");
 const builtin = @import("builtin");
 
 pub fn build(b: *std.Build) void {
-    // Get standard target options, but force GNU ABI on Windows
-    var resolved = b.standardTargetOptions(.{});
-    var tgt = resolved.result;
-
-    // Force GNU ABI on Windows to match Rust build
-    if (tgt.os.tag == .windows and tgt.abi != .gnu) {
-        var query = resolved.query;
-        query.abi = .gnu;
-        resolved = b.resolveTargetQuery(query);
-        tgt = resolved.result;
-    }
+    // Use standard target options (MSVC ABI on Windows by default, which works with
+    // MSYS2 clang64 libraries and provides better performance)
+    const resolved = b.standardTargetOptions(.{});
+    const tgt = resolved.result;
 
     const host = builtin.target;
     const optimize = b.standardOptimizeOption(.{});
@@ -278,42 +271,8 @@ pub fn build(b: *std.Build) void {
         b.getInstallStep().dependOn(&amod_install.step);
     }
 
-    const anicopy = b.addExecutable(.{
-        .name = "anicopy",
-        .root_module = b.createModule(.{ .target = resolved, .optimize = optimize, .link_libc = true }),
-    });
-    if (optimize == .ReleaseFast) {
-        anicopy.root_module.strip = true;
-    }
-
-    anicopy.addCSourceFile(.{ .file = b.path("src/helper/anicopy.c"), .flags = &.{ "-O3", "-gdwarf-4", "-Wall" } });
-    anicopy.root_module.addIncludePath(b.path(include_root));
-    anicopy.root_module.addIncludePath(b.path(src_root));
-    addSearchPathsForWindowsTarget(b, anicopy, tgt, host);
-    b.installArtifact(anicopy);
-
-    const convert = b.addExecutable(.{
-        .name = "convert",
-        .root_module = b.createModule(.{ .target = resolved, .optimize = optimize, .link_libc = true }),
-    });
-    if (optimize == .ReleaseFast) {
-        convert.root_module.strip = true;
-    }
-    convert.addCSourceFile(.{ .file = b.path("src/helper/convert.c"), .flags = &.{ "-O3", "-gdwarf-4", "-Wall", "-DSTANDALONE" } });
-    convert.root_module.addIncludePath(b.path(include_root));
-    convert.root_module.addIncludePath(b.path(src_root));
-    addSearchPathsForWindowsTarget(b, convert, tgt, host);
-
-    if (tgt.os.tag == .windows) {
-        linkSystemLibraryPreferDynamic(b, convert, "png", tgt);
-        linkSystemLibraryPreferDynamic(b, convert, "zip", tgt);
-        linkSystemLibraryPreferDynamic(b, convert, "z", tgt);
-    } else if (tgt.os.tag == .linux or tgt.os.tag == .macos) {
-        convert.root_module.linkSystemLibrary("png", .{});
-        convert.root_module.linkSystemLibrary("zip", .{});
-        convert.root_module.linkSystemLibrary("m", .{});
-    }
-    b.installArtifact(convert);
+    // Helper tools (anicopy, convert) are built via Makefile instead of Zig
+    // to avoid ABI compatibility issues with MSYS2 libraries on Windows
 
     const run = b.addRunArtifact(exe);
     if (b.args) |args| run.addArgs(args);
@@ -454,7 +413,7 @@ fn rustTripleFor(t: std.Target) []const u8 {
     return switch (t.cpu.arch) {
         .x86_64 => switch (t.os.tag) {
             .linux => "x86_64-unknown-linux-gnu",
-            .windows => "x86_64-pc-windows-gnullvm",
+            .windows => "x86_64-pc-windows-msvc",
             .macos => "x86_64-apple-darwin",
             else => @panic("unsupported OS for x86_64"),
         },
