@@ -2,4 +2,5 @@
 # Use with: git config blame.ignoreRevsFile .git-blame-ignore-revs
 
 # Global clang-format and rustfmt formatting
-d60ae00
+f7fb60c58bd8ebd24769e952b7d15bca4b601636
+5189487b915997622728d9361acbe14be37d6167
