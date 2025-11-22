@@ -189,6 +189,60 @@ jobs:
       with:
         name: macos-release
 
+    - name: Extract version and compute SHA256
+      id: vars
+      run: |
+        # Extract tag name (e.g., v1.0.0 or 1.0.0)
+        TAG_NAME="${GITHUB_REF_NAME}"
+        echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
+        
+        # Strip leading 'v' if present for pkgver
+        PKGVER="${TAG_NAME#v}"
+        echo "pkgver=${PKGVER}" >> $GITHUB_OUTPUT
+        
+        # Compute SHA256 of the Linux distribution tarball
+        SHA256=$(sha256sum linux_client.tar.gz | awk '{print $1}')
+        echo "sha256=${SHA256}" >> $GITHUB_OUTPUT
+        
+        echo "Version: ${PKGVER}"
+        echo "SHA256: ${SHA256}"
+
+    - name: Generate PKGBUILD
+      run: |
+        mkdir -p pkgbuild
+        sed \
+          -e "s|@PKGVER@|${{ steps.vars.outputs.pkgver }}|g" \
+          -e "s|@TAG@|${{ steps.vars.outputs.tag_name }}|g" \
+          -e "s|@GITHUB_REPO@|${{ github.repository }}|g" \
+          -e "s|@SHA256@|${{ steps.vars.outputs.sha256 }}|g" \
+          build/PKGBUILD.in > pkgbuild/PKGBUILD
+        
+        # Create a simple README in the pkgbuild directory
+        cat > pkgbuild/README.md << 'EOF'
+# Astonia Client - Arch Linux Package
+
+To build and install:
+```bash
+makepkg -si
+```
+
+To build without installing:
+```bash
+makepkg
+```
+
+To install the built package:
+```bash
+sudo pacman -U astonia-client-*.pkg.tar.zst
+```
+EOF
+        
+        echo "Generated PKGBUILD:"
+        cat pkgbuild/PKGBUILD
+        
+        # Create a tarball of the pkgbuild directory
+        tar czf pkgbuild.tar.gz pkgbuild/
+
     - name: Create Release
       uses: softprops/action-gh-release@v2
       with:
@@ -196,6 +250,7 @@ jobs:
           linux_client.tar.gz
           windows_client.zip
           macos_client.tar.gz
+          pkgbuild.tar.gz
         draft: false
         prerelease: false
         generate_release_notes: true
