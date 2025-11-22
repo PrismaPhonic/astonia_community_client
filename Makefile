@@ -1,14 +1,15 @@
 # Root Makefile - Platform dispatcher
 #
 # Usage:
-#   make              - Build for current platform (auto-detect)
-#   make windows      - Build for Windows
-#   make linux        - Build for Linux  
-#   make macos        - Build for macOS
-#   make zig-build    - Build with zig for current platform
-#   make docker-linux - Build Linux in Docker container
-#   make clean        - Clean all platforms
-#   make distrib      - Create distribution package
+#   make                - Build for current platform (auto-detect)
+#   make windows        - Build for Windows
+#   make linux          - Build for Linux  
+#   make macos          - Build for macOS
+#   make zig-build      - Build with zig for current platform
+#   make docker-linux   - Build Linux in Docker container
+#   make linux-appimage - Build Linux AppImage (portable, all distros)
+#   make clean          - Clean all platforms
+#   make distrib        - Create distribution package
 
 # Detect platform (defaults to Windows if unknown)
 UNAME_S := $(shell uname -s)
@@ -68,7 +69,24 @@ zig-build:
 
 # Docker build for Linux
 docker-linux:
+	cp build/containers/Dockerfile.linux .
 	docker build -f Dockerfile.linux -t astonia-linux-build .
 	docker run --rm -i -e HOST_UID=$(shell id -u) -e HOST_GID=$(shell id -g) -v "$(PWD):/app" -w /app astonia-linux-build
+	rm -f Dockerfile.linux
 
-.PHONY: all windows linux macos clean distrib amod convert anicopy zig-build docker-linux
+# Build Linux AppImage (portable, works on all distributions)
+linux-appimage:
+	@echo "Building Linux AppImage..."
+	cp build/containers/Dockerfile.appimage .
+	docker build -f Dockerfile.appimage -t astonia-appimage-build .
+	rm -f Dockerfile.appimage
+	docker run --rm -e HOST_UID=$(shell id -u) -e HOST_GID=$(shell id -g) -v "$(PWD):/output" astonia-appimage-build
+	mv astonia-client-*.AppImage astonia-client.AppImage
+	@echo ""
+	@echo "============================================"
+	@echo "AppImage created successfully!"
+	@echo "============================================"
+	@echo ""
+	@echo "To run: chmod +x astonia-client.AppImage && ./astonia-client.AppImage"
+
+.PHONY: all windows linux macos clean distrib amod convert anicopy zig-build docker-linux linux-appimage

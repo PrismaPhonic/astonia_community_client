@@ -163,9 +163,33 @@ jobs:
         path: macos_client.tar.gz
         retention-days: 90
 
+  build-appimage-release:
+    name: Build AppImage Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+      with:
+        lfs: true
+
+    - name: Checkout LFS objects
+      run: git lfs pull
+
+    - name: Build AppImage
+      run: make linux-appimage
+
+    - name: Upload AppImage
+      uses: actions/upload-artifact@v4
+      with:
+        name: appimage-release
+        path: astonia-client.AppImage
+        retention-days: 90
+
   create-release:
     name: Create GitHub Release
-    needs: [build-linux-release, build-windows-release, build-macos-release]
+    needs: [build-linux-release, build-windows-release, build-macos-release, build-appimage-release]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -210,6 +234,11 @@ jobs:
       with:
         name: macos-release
 
+    - name: Download AppImage release
+      uses: actions/download-artifact@v4
+      with:
+        name: appimage-release
+
     - name: Extract version and compute SHA256
       id: vars
       run: |
@@ -217,8 +246,10 @@ jobs:
         TAG_NAME="${GITHUB_REF_NAME}"
         echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
         
-        # Strip leading 'v' if present for pkgver
+        # Strip leading 'v' if present and sanitize for pkgver
+        # pkgver cannot contain hyphens, only alphanumeric and periods
         PKGVER="${TAG_NAME#v}"
+        PKGVER="${PKGVER//-/.}"  # Replace hyphens with periods
         echo "pkgver=${PKGVER}" >> $GITHUB_OUTPUT
         
         # Compute SHA256 of the source tarball (for PKGBUILD)
@@ -256,6 +287,7 @@ jobs:
           linux_client.tar.gz
           windows_client.zip
           macos_client.tar.gz
+          astonia-client.AppImage
           pkgbuild.tar.gz
         draft: false
         prerelease: false
