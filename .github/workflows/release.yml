@@ -173,6 +173,27 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v6
+      with:
+        lfs: true
+
+    - name: Checkout LFS objects
+      run: git lfs pull
+
+    - name: Create source tarball with LFS objects
+      run: |
+        # Create a source archive that includes LFS files
+        TAG_NAME="${GITHUB_REF_NAME}"
+        git archive --format=tar --prefix="astonia_community_client-${TAG_NAME}/" HEAD | tar -x
+        
+        # Copy LFS files into the extracted archive
+        find res -type f | while read file; do
+          mkdir -p "astonia_community_client-${TAG_NAME}/$(dirname "$file")"
+          cp "$file" "astonia_community_client-${TAG_NAME}/$file"
+        done
+        
+        # Create the final tarball
+        tar czf source-with-lfs.tar.gz "astonia_community_client-${TAG_NAME}/"
+        rm -rf "astonia_community_client-${TAG_NAME}/"
 
     - name: Download Linux release
       uses: actions/download-artifact@v4
@@ -189,13 +210,53 @@ jobs:
       with:
         name: macos-release
 
+    - name: Extract version and compute SHA256
+      id: vars
+      run: |
+        # Extract tag name (e.g., v1.0.0 or 1.0.0)
+        TAG_NAME="${GITHUB_REF_NAME}"
+        echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
+        
+        # Strip leading 'v' if present for pkgver
+        PKGVER="${TAG_NAME#v}"
+        echo "pkgver=${PKGVER}" >> $GITHUB_OUTPUT
+        
+        # Compute SHA256 of the source tarball (for PKGBUILD)
+        SHA256=$(sha256sum source-with-lfs.tar.gz | awk '{print $1}')
+        echo "sha256=${SHA256}" >> $GITHUB_OUTPUT
+        
+        echo "Version: ${PKGVER}"
+        echo "SHA256: ${SHA256}"
+
+    - name: Generate PKGBUILD
+      run: |
+        # Copy the pkgbuild template directory
+        cp -r build/pkgbuild astonia-client-pkgbuild
+        
+        # Generate the final PKGBUILD from template
+        sed \
+          -e "s|@PKGVER@|${{ steps.vars.outputs.pkgver }}|g" \
+          -e "s|@TAG@|${{ steps.vars.outputs.tag_name }}|g" \
+          -e "s|@GITHUB_REPO@|${{ github.repository }}|g" \
+          -e "s|@SHA256@|${{ steps.vars.outputs.sha256 }}|g" \
+          astonia-client-pkgbuild/PKGBUILD.in > astonia-client-pkgbuild/PKGBUILD
+        rm astonia-client-pkgbuild/PKGBUILD.in
+        
+        echo "Generated PKGBUILD:"
+        cat astonia-client-pkgbuild/PKGBUILD
+        
+        # Create a tarball of the pkgbuild directory
+        tar czf pkgbuild.tar.gz astonia-client-pkgbuild/
+
     - name: Create Release
       uses: softprops/action-gh-release@v2
       with:
         files: |
+          source-with-lfs.tar.gz
           linux_client.tar.gz
           windows_client.zip
           macos_client.tar.gz
+          pkgbuild.tar.gz
         draft: false
         prerelease: false
         generate_release_notes: true

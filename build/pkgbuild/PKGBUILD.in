@@ -1,0 +1,44 @@
+pkgname=astonia-client
+pkgver=@PKGVER@
+pkgrel=1
+pkgdesc="Astonia 3 Community Client - A modernized client for the Astonia 3 MMORPG"
+arch=('x86_64')
+url="https://github.com/@GITHUB_REPO@"
+license=('custom')
+depends=('sdl3' 'sdl2-compat' 'sdl2_mixer' 'libpng' 'libzip' 'zlib')
+makedepends=('base-devel' 'clang' 'rust')
+source=("${pkgname}-${pkgver}.tar.gz::https://github.com/@GITHUB_REPO@/releases/download/@TAG@/source-with-lfs.tar.gz")
+sha256sums=('@SHA256@')
+
+build() {
+    cd "${srcdir}/astonia_community_client-@TAG@"
+    make linux
+    strip bin/moac
+    strip bin/libastonia_net.so
+}
+
+package() {
+    cd "${srcdir}/astonia_community_client-@TAG@"
+
+    # Install binary to /opt/astonia
+    install -dm755 "${pkgdir}/opt/astonia/bin"
+    install -m755 bin/moac "${pkgdir}/opt/astonia/bin/"
+
+    # Install libastonia_net.so to system library path
+    install -Dm755 bin/libastonia_net.so "${pkgdir}/usr/lib/libastonia_net.so"
+
+    # Install resources
+    install -dm755 "${pkgdir}/opt/astonia/res"
+    cp -r res/* "${pkgdir}/opt/astonia/res/"
+
+    # Create wrapper script in /usr/bin
+    install -dm755 "${pkgdir}/usr/bin"
+    cat >"${pkgdir}/usr/bin/astonia-client" <<'EOF'
+#!/bin/bash
+cd /opt/astonia
+exec ./bin/moac "$@"
+EOF
+    chmod 755 "${pkgdir}/usr/bin/astonia-client"
+}
+
+
