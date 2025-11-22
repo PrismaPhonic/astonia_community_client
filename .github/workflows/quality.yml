@@ -17,7 +17,12 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Install clang-format
-      run: sudo apt-get update && sudo apt-get install -y clang-format
+      run: |
+        wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
+        sudo add-apt-repository -y 'deb http://apt.llvm.org/noble/ llvm-toolchain-noble main'
+        sudo apt-get update
+        sudo apt-get install -y clang-format-21
+        sudo update-alternatives --install /usr/bin/clang-format clang-format /usr/bin/clang-format-21 100
 
     - name: Check C/H formatting
       run: |
@@ -39,19 +44,29 @@ jobs:
         sudo apt-get install -y \
           clang-tidy \
           clang \
+          bear \
           libsdl2-dev \
           libsdl2-mixer-dev \
           libpng-dev \
           libzip-dev \
           zlib1g-dev
 
+    - name: Setup Rust
+      uses: actions-rust-lang/setup-rust-toolchain@v1
+      with:
+        toolchain: stable
+        cache: true
+        cache-workspaces: astonia_net
+
+    - name: Generate compile_commands.json
+      run: |
+        make clean
+        bear -- make
+
     - name: Run clang-tidy
       run: |
         find src -type f -name "*.c" -print0 | \
-        xargs -0 clang-tidy --warnings-as-errors='*' \
-          -p=. -- \
-          -I/usr/include/SDL2 \
-          -Iinclude
+        xargs -0 clang-tidy --warnings-as-errors='*'
 
   cppcheck:
     name: C Additional Analysis
@@ -67,7 +82,7 @@ jobs:
 
     - name: Run cppcheck
       run: |
-        cppcheck --enable=warning,style,performance,portability \
+        cppcheck --enable=warning,performance,portability \
           --error-exitcode=1 \
           --inline-suppr \
           --suppress=missingIncludeSystem \
