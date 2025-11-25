@@ -104,7 +104,6 @@ void dd_set_clip(int sx, int sy, int ex, int ey)
 
 int dd_init(void)
 {
-	note("dd_init: Setting clipping variables");
 	// set the clipping to the maximum possible
 	clippos = 0;
 	clipsx = 0;
@@ -112,15 +111,9 @@ int dd_init(void)
 	clipex = XRES;
 	clipey = YRES;
 
-	note("dd_init: About to call dd_create_font");
 	dd_create_font();
-	note("dd_init: dd_create_font returned");
-
-	note("dd_init: About to call dd_init_text");
 	dd_init_text();
-	note("dd_init: dd_init_text returned");
 
-	note("dd_init: Returning successfully");
 	return 0;
 }
 

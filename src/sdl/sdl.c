@@ -110,6 +110,9 @@ int sdl_init(int width, int height, char *title)
 	int len, i;
 	SDL_DisplayMode DM;
 
+	// Note: SDL_SetMemoryFunctions() is now called at the very start of main()
+	// to ensure it's set before any SDL calls, including SDL_GetPrefPath()
+
 	if (SDL_Init(SDL_INIT_VIDEO | ((game_options & GO_SOUND) ? SDL_INIT_AUDIO : 0)) != 0) {
 		fail("SDL_Init Error: %s", SDL_GetError());
 		return 0;
@@ -273,27 +276,19 @@ int sdl_init(int width, int height, char *title)
 		note("Allocated %d sound channels", number_of_sound_channels);
 	}
 
-	note("sdl_init: About to create background thread synchronization");
 	if (sdl_multi) {
 		char buf[80];
 		int n;
 
-		note("sdl_init: Creating semaphore");
 		prework = SDL_CreateSemaphore(0);
-		note("sdl_init: Creating mutex");
 		premutex = SDL_CreateMutex();
-		note("sdl_init: Creating %d background threads", sdl_multi);
 
 		for (n = 0; n < sdl_multi; n++) {
 			sprintf(buf, "moac background worker %d", n);
-			note("sdl_init: Creating background thread %d", n);
 			SDL_CreateThread(sdl_pre_backgnd, buf, (void *)(long long)n);
-			note("sdl_init: Background thread %d created", n);
 		}
-		note("sdl_init: All background threads created");
 	}
 
-	note("sdl_init: Returning successfully");
 	return 1;
 }
 
@@ -2522,6 +2517,21 @@ void sdl_exit(void)
 #ifdef DEVELOPER
 	sdl_dump_spritecache();
 #endif
+
+	// Clean up SDL resources before SDL_Quit()
+	if (sdlren) {
+		SDL_DestroyRenderer(sdlren);
+		sdlren = NULL;
+	}
+	if (sdlwnd) {
+		SDL_DestroyWindow(sdlwnd);
+		sdlwnd = NULL;
+	}
+
+	// Explicitly quit SDL - this will free all SDL-allocated memory using mi_free
+	// We do this explicitly to ensure proper cleanup order
+	// Note: mimalloc must remain active during SDL_Quit() since SDL will use mi_free
+	SDL_Quit();
 }
 
 int sdl_drawtext(int sx, int sy, unsigned short int color, int flags, const char *text, struct ddfont *font, int clipsx,
@@ -3231,14 +3241,10 @@ int sdl_pre_2(void)
 				}
 
 				// Load PNG from zip (blocking I/O, but now in background thread)
-				note("sdl_pre_2: About to call sdl_ic_load for sprite %d", sdlt[pre[i].stx].sprite);
 				sdl_ic_load(sdlt[pre[i].stx].sprite);
-				note("sdl_pre_2: sdl_ic_load completed for sprite %d", sdlt[pre[i].stx].sprite);
 
 				// Allocate pixel buffer
-				note("sdl_pre_2: About to call sdl_make stage 1 for sprite %d", sdlt[pre[i].stx].sprite);
 				sdl_make(sdlt + pre[i].stx, sdli + sdlt[pre[i].stx].sprite, 1);
-				note("sdl_pre_2: sdl_make stage 1 completed for sprite %d", sdlt[pre[i].stx].sprite);
 
 				if (sdl_multi) {
 					SDL_LockMutex(premutex);
@@ -3362,8 +3368,6 @@ uint64_t sdl_backgnd_wait = 0, sdl_backgnd_work = 0;
 
 int sdl_pre_backgnd(void *ptr)
 {
-	int thread_num = (int)(long long)ptr;
-	note("sdl_pre_backgnd: Thread %d started", thread_num);
 	uint64_t start;
 
 	while (!quit) {

@@ -808,6 +808,9 @@ void register_crash_handler(void);
 // main
 int main(int argc, char *args[])
 {
+	// Configure SDL to use mimalloc for all its internal allocations
+	// This MUST be called before ANY SDL function, including SDL_GetPrefPath()
+	SDL_SetMemoryFunctions(mi_malloc, mi_calloc, mi_realloc, mi_free);
 
 	int ret;
 	char buf[80], buffer[1024];
@@ -894,20 +897,13 @@ int main(int argc, char *args[])
 	}
 
 	sprintf(buf, "Astonia 3 v%d.%d.%d", (VERSION >> 16) & 255, (VERSION >> 8) & 255, (VERSION) & 255);
-	note("main: About to call sdl_init");
 	if (!sdl_init(want_width, want_height, buf)) {
 		dd_exit();
 		return -1;
 	}
-	note("main: sdl_init returned successfully");
 
-	note("main: About to call dd_init");
 	dd_init();
-	note("main: dd_init returned successfully");
-
-	note("main: About to call init_sound");
 	init_sound();
-	note("main: init_sound returned successfully");
 
 	if (game_options & GO_LARGE) {
 		namesize = 0;

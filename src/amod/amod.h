@@ -24,8 +24,8 @@ int amod_keyup(int key); // ... you must also catch keyup
 int amod_client_cmd(const char *buf);
 
 // main mod only:
-DLL_EXPORT int amod_process(const char *buf); // return length of server command, 0 = unknown
-DLL_EXPORT int amod_prefetch(const char *buf); // return length of server command, 0 = unknown
+int amod_process(const char *buf); // return length of server command, 0 = unknown
+int amod_prefetch(const char *buf); // return length of server command, 0 = unknown
 int amod_display_skill_line(int v, int base, int curr, int cn, char *buf);
 int amod_is_playersprite(int sprite);
 
