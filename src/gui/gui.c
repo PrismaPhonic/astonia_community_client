@@ -1120,6 +1120,10 @@ display_graphs:
 		sdl_time_blit = 0;
 		sdl_backgnd_work = 0;
 		sdl_backgnd_wait = 0;
+		// Log if zip/PNG I/O time exceeds threshold that would cause frame skips (10ms - artifacts can appear at 11ms+)
+		if (sdl_time_load > 10) {
+			note("sdl_time_load: %llums (zip/PNG I/O spike - may cause frame skip)", sdl_time_load);
+		}
 		sdl_time_load = 0;
 		sdl_time_pre1 = 0;
 		sdl_time_pre2 = 0;

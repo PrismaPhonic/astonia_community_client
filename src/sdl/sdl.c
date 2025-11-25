@@ -11,10 +11,14 @@
 #include <inttypes.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_mixer.h>
 #include <png.h>
 #include <zip.h>
+
+// Use mimalloc for texture pixel buffers to avoid heap allocator overhead
+#include <mimalloc.h>
 
 #include "../../src/dll.h"
 #include "../../src/astonia.h"
@@ -269,19 +273,27 @@ int sdl_init(int width, int height, char *title)
 		note("Allocated %d sound channels", number_of_sound_channels);
 	}
 
+	note("sdl_init: About to create background thread synchronization");
 	if (sdl_multi) {
 		char buf[80];
 		int n;
 
+		note("sdl_init: Creating semaphore");
 		prework = SDL_CreateSemaphore(0);
+		note("sdl_init: Creating mutex");
 		premutex = SDL_CreateMutex();
+		note("sdl_init: Creating %d background threads", sdl_multi);
 
 		for (n = 0; n < sdl_multi; n++) {
 			sprintf(buf, "moac background worker %d", n);
+			note("sdl_init: Creating background thread %d", n);
 			SDL_CreateThread(sdl_pre_backgnd, buf, (void *)(long long)n);
+			note("sdl_init: Background thread %d created", n);
 		}
+		note("sdl_init: All background threads created");
 	}
 
+	note("sdl_init: Returning successfully");
 	return 1;
 }
 
@@ -641,7 +653,7 @@ int sdl_load_image_png_(struct sdl_image *si, char *filename, zip_t *zip)
 	si->yoff = -(p.yres / 2) + sy;
 
 #ifdef SDL_FAST_MALLOC
-	si->pixel = malloc(si->xres * si->yres * sizeof(uint32_t));
+	si->pixel = mi_malloc(si->xres * si->yres * sizeof(uint32_t));
 #else
 	si->pixel = xmalloc(si->xres * si->yres * sizeof(uint32_t), MEM_SDL_PNG);
 #endif
@@ -761,7 +773,7 @@ int sdl_load_image_png(struct sdl_image *si, char *filename, zip_t *zip, int smo
 	si->yoff = -(p.yres / 2) + sy;
 
 #ifdef SDL_FAST_MALLOC
-	si->pixel = malloc(si->xres * si->yres * sizeof(uint32_t) * sdl_scale * sdl_scale);
+	si->pixel = mi_malloc(si->xres * si->yres * sizeof(uint32_t) * sdl_scale * sdl_scale);
 #else
 	si->pixel = xmalloc(si->xres * si->yres * sizeof(uint32_t) * sdl_scale * sdl_scale, MEM_SDL_PNG);
 #endif
@@ -1400,7 +1412,7 @@ static void sdl_make(struct sdl_texture *st, struct sdl_image *si, int preload)
 			return;
 		}
 #ifdef SDL_FAST_MALLOC
-		st->pixel = malloc(st->xres * st->yres * sizeof(uint32_t) * sdl_scale * sdl_scale);
+		st->pixel = mi_malloc(st->xres * st->yres * sizeof(uint32_t) * sdl_scale * sdl_scale);
 #else
 		st->pixel = xmalloc(st->xres * st->yres * sizeof(uint32_t) * sdl_scale * sdl_scale, MEM_SDL_PIXEL);
 #endif
@@ -1686,7 +1698,7 @@ static void sdl_make(struct sdl_texture *st, struct sdl_image *si, int preload)
 			texture = NULL;
 		}
 #ifdef SDL_FAST_MALLOC
-		free(st->pixel);
+		mi_free(st->pixel);
 #else
 		xfree(st->pixel);
 #endif
@@ -2090,7 +2102,7 @@ int sdl_tx_load(int sprite, int sink, int freeze, int scale, int cr, int cg, int
 		} else if (sdlt[stx].flags & SF_DIDALLOC) {
 			if (sdlt[stx].pixel) {
 #ifdef SDL_FAST_MALLOC
-				free(sdlt[stx].pixel);
+				mi_free(sdlt[stx].pixel);
 #else
 				xfree(sdlt[stx].pixel);
 #endif
@@ -2099,7 +2111,7 @@ int sdl_tx_load(int sprite, int sink, int freeze, int scale, int cr, int cg, int
 		}
 #ifdef SDL_FAST_MALLOC
 		if (sdlt[stx].flags & SF_TEXT) {
-			free(sdlt[stx].text);
+			mi_free(sdlt[stx].text);
 			sdlt[stx].text = NULL;
 		}
 #else
@@ -2123,7 +2135,12 @@ int sdl_tx_load(int sprite, int sink, int freeze, int scale, int cr, int cg, int
 		sdlt[stx].text_flags = text_flags;
 		sdlt[stx].text_font = text_font;
 #ifdef SDL_FAST_MALLOC
-		sdlt[stx].text = strdup(text);
+		// strdup uses malloc internally, so we need to use mi_strdup or allocate with mi_malloc
+		size_t len = strlen(text) + 1;
+		sdlt[stx].text = mi_malloc(len);
+		if (sdlt[stx].text) {
+			memcpy(sdlt[stx].text, text, len);
+		}
 #else
 		sdlt[stx].text = xstrdup(text, MEM_TEMP7);
 #endif
@@ -2283,7 +2300,7 @@ SDL_Texture *sdl_maketext(const char *text, struct ddfont *font, uint32_t color,
 	}
 
 #ifdef SDL_FAST_MALLOC
-	pixel = calloc(sizex * MAXFONTHEIGHT, sizeof(uint32_t));
+	pixel = mi_calloc(sizex * MAXFONTHEIGHT, sizeof(uint32_t));
 #else
 	pixel = xmalloc(sizex * MAXFONTHEIGHT * sizeof(uint32_t), MEM_SDL_PIXEL2);
 #endif
@@ -2345,7 +2362,7 @@ SDL_Texture *sdl_maketext(const char *text, struct ddfont *font, uint32_t color,
 		warn("SDL_texture Error: %s maketext (%s)", SDL_GetError(), otext);
 	}
 #ifdef SDL_FAST_MALLOC
-	free(pixel);
+	mi_free(pixel);
 #else
 	xfree(pixel);
 #endif
@@ -2947,7 +2964,7 @@ DLL_EXPORT uint32_t *sdl_load_png(char *filename, int *dx, int *dy)
 	}
 
 #ifdef SDL_FAST_MALLOC
-	pixel = malloc(xres * yres * sizeof(uint32_t));
+	pixel = mi_malloc(xres * yres * sizeof(uint32_t));
 #else
 	pixel = xmalloc(xres * yres * sizeof(uint32_t), MEM_TEMP8);
 #endif
@@ -3158,16 +3175,29 @@ int sdl_pre_1(void)
 		return 0; // prefetch buffer is empty
 	}
 
-	if (!(sdlt[pre[pre_1].stx].flags & SF_DIDALLOC)) {
-		sdl_ic_load(sdlt[pre[pre_1].stx].sprite);
-
-		sdl_make(sdlt + pre[pre_1].stx, sdli + sdlt[pre[pre_1].stx].sprite, 1);
-
+	// Advance pre_1 only when I/O + allocation is complete
+	// The actual I/O work is done in sdl_pre_2() (background threads when sdl_multi > 0)
+	// This prevents blocking the render thread with zip/PNG I/O operations
+	if (pre[pre_1].stx != STX_NONE && (sdlt[pre[pre_1].stx].flags & SF_DIDALLOC)) {
+		pre_1 = (pre_1 + 1) % MAXPRE;
 		if (sdl_multi) {
-			SDL_SemPost(prework);
+			SDL_SemPost(prework); // Signal background threads to process
 		}
+		return 1;
 	}
-	pre_1 = (pre_1 + 1) % MAXPRE;
+
+	// If sdl_multi is disabled, do the work synchronously (old behavior)
+	if (!sdl_multi && pre[pre_1].stx != STX_NONE && !(sdlt[pre[pre_1].stx].flags & SF_DIDALLOC)) {
+		sdl_ic_load(sdlt[pre[pre_1].stx].sprite);
+		sdl_make(sdlt + pre[pre_1].stx, sdli + sdlt[pre[pre_1].stx].sprite, 1);
+		pre_1 = (pre_1 + 1) % MAXPRE;
+		return 1;
+	}
+
+	// Signal background threads to do the I/O work
+	if (sdl_multi) {
+		SDL_SemPost(prework);
+	}
 
 	return 1;
 }
@@ -3185,8 +3215,52 @@ int sdl_pre_2(void)
 			SDL_LockMutex(premutex);
 		}
 
+		if (pre[i].stx == STX_NONE) {
+			if (sdl_multi) {
+				SDL_UnlockMutex(premutex);
+			}
+			continue;
+		}
+
+		// Stage 1: Load image from zip/PNG (I/O - now in background thread to avoid blocking render)
+		if (!(sdlt[pre[i].stx].flags & SF_DIDALLOC)) {
+			if (!(sdlt[pre[i].stx].flags & SF_BUSY)) {
+				sdlt[pre[i].stx].flags |= SF_BUSY;
+				if (sdl_multi) {
+					SDL_UnlockMutex(premutex);
+				}
+
+				// Load PNG from zip (blocking I/O, but now in background thread)
+				note("sdl_pre_2: About to call sdl_ic_load for sprite %d", sdlt[pre[i].stx].sprite);
+				sdl_ic_load(sdlt[pre[i].stx].sprite);
+				note("sdl_pre_2: sdl_ic_load completed for sprite %d", sdlt[pre[i].stx].sprite);
+
+				// Allocate pixel buffer
+				note("sdl_pre_2: About to call sdl_make stage 1 for sprite %d", sdlt[pre[i].stx].sprite);
+				sdl_make(sdlt + pre[i].stx, sdli + sdlt[pre[i].stx].sprite, 1);
+				note("sdl_pre_2: sdl_make stage 1 completed for sprite %d", sdlt[pre[i].stx].sprite);
+
+				if (sdl_multi) {
+					SDL_LockMutex(premutex);
+				}
+				sdlt[pre[i].stx].flags &= ~SF_BUSY;
+				sdlt[pre[i].stx].flags |= SF_DIDALLOC;
+				if (sdl_multi) {
+					SDL_UnlockMutex(premutex);
+				}
+				work = 1;
+				break;
+			} else {
+				if (sdl_multi) {
+					SDL_UnlockMutex(premutex);
+				}
+				continue; // Skip if already being processed
+			}
+		}
+
+		// Stage 2: Make texture (CPU work)
 		// printf("Preload2: Slot %d, STX %d, flags %X\n",i,pre[i].stx,pre[i].stx!=-1 ? sdlt[pre[i].stx].flags : 0);
-		if (pre[i].stx != STX_NONE && !(sdlt[pre[i].stx].flags & (SF_DIDMAKE | SF_BUSY)) &&
+		if (!(sdlt[pre[i].stx].flags & (SF_DIDMAKE | SF_BUSY)) &&
 		    (sdlt[pre[i].stx].flags & SF_DIDALLOC)) {
 			// printf("Preload2: Slot %d, sprite %d (%d, %d, %d, %d)\n",i,pre[i].sprite,pre_in,pre_1,pre_2,pre_3);
 			// fflush(stdout);
@@ -3288,6 +3362,8 @@ uint64_t sdl_backgnd_wait = 0, sdl_backgnd_work = 0;
 
 int sdl_pre_backgnd(void *ptr)
 {
+	int thread_num = (int)(long long)ptr;
+	note("sdl_pre_backgnd: Thread %d started", thread_num);
 	uint64_t start;
 
 	while (!quit) {

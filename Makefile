@@ -61,6 +61,9 @@ convert:
 anicopy:
 	@$(MAKE) -f build/make/Makefile.$(PLATFORM) anicopy
 
+debug:
+	@$(MAKE) -f build/make/Makefile.$(PLATFORM) debug
+
 # Zig build target
 zig-build:
 	cp build/build.zig .
@@ -116,4 +119,4 @@ zen4-appimage:
 	@echo "To run: chmod +x astonia-client-zen4.AppImage && ./astonia-client.AppImage"
 
 
-.PHONY: all windows linux macos clean distrib amod convert anicopy zig-build docker-linux docker-windows docker-windows-dev linux-appimage
+.PHONY: all windows linux macos debug clean distrib amod convert anicopy zig-build docker-linux docker-windows docker-windows-dev linux-appimage

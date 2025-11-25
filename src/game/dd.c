@@ -20,6 +20,9 @@
 #include "../../src/game/_game.h"
 #include "../../src/client.h"
 #include "../../src/sdl.h"
+#ifdef SDL_FAST_MALLOC
+#include <mimalloc.h>
+#endif
 
 DDFONT *fonta_shaded = NULL;
 DDFONT *fonta_framed = NULL;
@@ -101,6 +104,7 @@ void dd_set_clip(int sx, int sy, int ex, int ey)
 
 int dd_init(void)
 {
+	note("dd_init: Setting clipping variables");
 	// set the clipping to the maximum possible
 	clippos = 0;
 	clipsx = 0;
@@ -108,9 +112,15 @@ int dd_init(void)
 	clipex = XRES;
 	clipey = YRES;
 
+	note("dd_init: About to call dd_create_font");
 	dd_create_font();
-	dd_init_text();
+	note("dd_init: dd_create_font returned");
 
+	note("dd_init: About to call dd_init_text");
+	dd_init_text();
+	note("dd_init: dd_init_text returned");
+
+	note("dd_init: Returning successfully");
 	return 0;
 }
 
@@ -784,7 +794,7 @@ void dd_create_font(void)
 		dd_create_font_png(fontb, pixel, dx, dy, 0, sdl_scale);
 		dd_create_font_png(fontc, pixel, dx, dy, 80 * sdl_scale, sdl_scale);
 #ifdef SDL_FAST_MALLOC
-		free(pixel);
+		mi_free(pixel);
 #else
 		xfree(pixel);
 #endif

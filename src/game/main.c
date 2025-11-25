@@ -15,6 +15,8 @@
 #ifdef _WIN32
 #include <windows.h>
 #endif
+// Use mimalloc for texture pixel buffers
+#include <mimalloc.h>
 
 #include "../../src/astonia.h"
 #include "../../src/game.h"
@@ -318,7 +320,7 @@ void *xmalloc(int size, int ID)
 
 	memptrused++;
 
-	mem = calloc(1, 8 + sizeof(memcheck) + size + sizeof(memcheck));
+	mem = mi_calloc(1, 8 + sizeof(memcheck) + size + sizeof(memcheck));
 	if (!mem) {
 		fail("OUT OF MEMORY !!!");
 		return NULL;
@@ -398,7 +400,7 @@ void xfree(void *ptr)
 	memptrused--;
 	memused -= 8 + sizeof(memcheck) + mem->size + sizeof(memcheck);
 
-	free(mem);
+	mi_free(mem);
 }
 
 void xinfo(void *ptr)
@@ -446,7 +448,7 @@ void *xrealloc(void *ptr, int size, int ID)
 
 	memused -= 8 + sizeof(memcheck) + mem->size + sizeof(memcheck);
 
-	struct memhead *new_mem = realloc(mem, 8 + sizeof(memcheck) + size + sizeof(memcheck));
+	struct memhead *new_mem = mi_realloc(mem, 8 + sizeof(memcheck) + size + sizeof(memcheck));
 	if (!new_mem) {
 		// Restore counters since realloc failed
 		memsize[mem->ID] += mem->size;
@@ -513,7 +515,7 @@ void *xrecalloc(void *ptr, int size, int ID)
 	memused -= 8 + sizeof(memcheck) + mem->size + sizeof(memcheck);
 
 	int old_size = mem->size;
-	struct memhead *new_mem = realloc(mem, 8 + sizeof(memcheck) + size + sizeof(memcheck));
+	struct memhead *new_mem = mi_realloc(mem, 8 + sizeof(memcheck) + size + sizeof(memcheck));
 	if (!new_mem) {
 		// Restore counters since realloc failed
 		memsize[mem->ID] += old_size;
@@ -580,7 +582,7 @@ void display_usage(void)
 {
 	char *buf, *txt;
 
-	txt = buf = malloc(1024 * 8);
+	txt = buf = mi_malloc(1024 * 8);
 	*buf = '\0'; // Initialize buffer
 	buf += sprintf(
 	    buf, "The Astonia Client can only be started from the command line or with a specially created shortcut.\n\n");
@@ -614,7 +616,7 @@ void display_usage(void)
 
 	printf("%s", txt);
 
-	free(txt);
+	mi_free(txt);
 }
 
 DLL_EXPORT char server_url[256];
@@ -806,6 +808,7 @@ void register_crash_handler(void);
 // main
 int main(int argc, char *args[])
 {
+
 	int ret;
 	char buf[80], buffer[1024];
 	char filename[MAX_PATH];
@@ -891,13 +894,20 @@ int main(int argc, char *args[])
 	}
 
 	sprintf(buf, "Astonia 3 v%d.%d.%d", (VERSION >> 16) & 255, (VERSION >> 8) & 255, (VERSION) & 255);
+	note("main: About to call sdl_init");
 	if (!sdl_init(want_width, want_height, buf)) {
 		dd_exit();
 		return -1;
 	}
+	note("main: sdl_init returned successfully");
 
+	note("main: About to call dd_init");
 	dd_init();
+	note("main: dd_init returned successfully");
+
+	note("main: About to call init_sound");
 	init_sound();
+	note("main: init_sound returned successfully");
 
 	if (game_options & GO_LARGE) {
 		namesize = 0;

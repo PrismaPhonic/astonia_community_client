@@ -101,7 +101,7 @@ DLL_EXPORT int amod_process(const char *buf)
 	switch (buf[0]) {
 	case SV_MOD1:
 		addline("process got sv_mod1");
-		return 5;
+		return 7;
 	}
 	return 0;
 }
@@ -110,7 +110,7 @@ DLL_EXPORT int amod_prefetch(const char *buf)
 {
 	switch (buf[0]) {
 	case SV_MOD1:
-		return 5;
+		return 7;
 	}
 	return 0;
 }
