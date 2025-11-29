@@ -10,6 +10,7 @@
 
 #include <inttypes.h>
 #include <stdint.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_mixer.h>
@@ -25,25 +26,22 @@ extern int sockstate; // Declare early for use in wait logging
 #endif
 
 // Lock-free flag read helpers (writes under mutex)
-// Cast atomic type to regular pointer for __atomic_* functions
 static inline uint16_t flags_load(struct sdl_texture *st)
 {
-	uint16_t *flags_ptr = (uint16_t *)&st->flags;
-	return __atomic_load_n(flags_ptr, __ATOMIC_ACQUIRE);
+	return atomic_load_explicit(&st->flags, memory_order_acquire);
 }
 
 // Atomically set flag if not already set (returns 1 if successfully set, 0 if already set)
 static inline int flags_set_if_not_set(struct sdl_texture *st, uint16_t mask)
 {
-	uint16_t *flags_ptr = (uint16_t *)&st->flags;
 	uint16_t old, new;
 	do {
-		old = __atomic_load_n(flags_ptr, __ATOMIC_ACQUIRE);
+		old = atomic_load_explicit(&st->flags, memory_order_acquire);
 		if (old & mask) {
 			return 0; // Already set
 		}
 		new = old | mask;
-	} while (!__atomic_compare_exchange_n(flags_ptr, &old, new, 0, __ATOMIC_RELEASE, __ATOMIC_ACQUIRE));
+	} while (!atomic_compare_exchange_weak_explicit(&st->flags, &old, new, memory_order_release, memory_order_acquire));
 	return 1; // Successfully set
 }
 
@@ -233,8 +231,7 @@ int sdl_init(int width, int height, char *title)
 	}
 
 	for (i = 0; i < MAX_TEXCACHE; i++) {
-		uint16_t *flags_ptr = (uint16_t *)&sdlt[i].flags;
-		__atomic_store_n(flags_ptr, 0, __ATOMIC_RELAXED);
+		atomic_store_explicit(&sdlt[i].flags, 0, memory_order_relaxed);
 		sdlt[i].prev = i - 1;
 		sdlt[i].next = i + 1;
 		sdlt[i].hnext = STX_NONE;
@@ -1615,8 +1612,7 @@ static void sdl_make(struct sdl_texture *st, struct sdl_image *si, int preload)
 #else
 			st->pixel = xmalloc(st->xres * st->yres * sizeof(uint32_t) * sdl_scale * sdl_scale, MEM_SDL_PIXEL);
 #endif
-			uint16_t *flags_ptr = (uint16_t *)&st->flags;
-			__atomic_fetch_or(flags_ptr, SF_DIDALLOC, __ATOMIC_RELEASE);
+			atomic_fetch_or_explicit(&st->flags, SF_DIDALLOC, memory_order_release);
 		}
 		// If already allocated, skip allocation but continue to set sdlm_* variables below
 	}
@@ -1856,8 +1852,7 @@ static void sdl_make(struct sdl_texture *st, struct sdl_image *si, int preload)
 				st->pixel[x + y * st->xres * sdl_scale] = irgb;
 			}
 		}
-		uint16_t *flags_ptr = (uint16_t *)&st->flags;
-		__atomic_fetch_or(flags_ptr, SF_DIDMAKE, __ATOMIC_RELEASE);
+		atomic_fetch_or_explicit(&st->flags, SF_DIDMAKE, memory_order_release);
 
 #ifdef DEVELOPER
 		if (preload) {
@@ -1909,8 +1904,7 @@ static void sdl_make(struct sdl_texture *st, struct sdl_image *si, int preload)
 		st->pixel = NULL;
 		st->tex = texture;
 
-		uint16_t *flags_ptr = (uint16_t *)&st->flags;
-		__atomic_fetch_or(flags_ptr, SF_DIDTEX, __ATOMIC_RELEASE);
+		atomic_fetch_or_explicit(&st->flags, SF_DIDTEX, memory_order_release);
 
 #ifdef DEVELOPER
 		sdl_time_tex += SDL_GetTicks64() - start;
@@ -2255,8 +2249,7 @@ int sdl_tx_load(int sprite, int sink, int freeze, int scale, int cr, int cg, int
 				SDL_Delay(1);
 
 				if (panic++ > 100) {
-					uint16_t *flags_ptr = (uint16_t *)&sdlt[stx].flags;
-					uint16_t f2 = __atomic_load_n(flags_ptr, __ATOMIC_ACQUIRE);
+					uint16_t f2 = atomic_load_explicit(&sdlt[stx].flags, memory_order_acquire);
 					warn("Timeout waiting to evict stx=%d sprite=%d (flags=0x%04x)", stx, sdlt[stx].sprite, f2);
 
 					// If a job is actually in progress, do NOT evict this entry
@@ -2269,14 +2262,14 @@ int sdl_tx_load(int sprite, int sink, int freeze, int scale, int cr, int cg, int
 							return STX_NONE;
 						}
 						// Only neutralize queue entries if nothing is actually claiming it
-						__atomic_fetch_and(flags_ptr, (uint16_t)~SF_INQUEUE, __ATOMIC_RELEASE);
+						atomic_fetch_and_explicit(&sdlt[stx].flags, (uint16_t)~SF_INQUEUE, memory_order_release);
 						neutralize_stale_jobs(stx);
 						stx = candidate;
 						break;
 					}
 
 					// Only neutralize queue entries if nothing is actually claiming it
-					__atomic_fetch_and(flags_ptr, (uint16_t)~SF_INQUEUE, __ATOMIC_RELEASE);
+					atomic_fetch_and_explicit(&sdlt[stx].flags, (uint16_t)~SF_INQUEUE, memory_order_release);
 					neutralize_stale_jobs(stx);
 					break;
 				}
@@ -2343,8 +2336,7 @@ int sdl_tx_load(int sprite, int sink, int freeze, int scale, int cr, int cg, int
 		}
 #endif
 
-		uint16_t *flags_ptr = (uint16_t *)&sdlt[stx].flags;
-		__atomic_store_n(flags_ptr, 0, __ATOMIC_RELEASE);
+		atomic_store_explicit(&sdlt[stx].flags, 0, memory_order_release);
 		break; // Successfully evicted, exit the retry loop
 	}
 
@@ -2370,8 +2362,7 @@ int sdl_tx_load(int sprite, int sink, int freeze, int scale, int cr, int cg, int
 	if (text) {
 		int w, h;
 		sdlt[stx].tex = sdl_maketext(text, (struct ddfont *)text_font, text_color, text_flags);
-		uint16_t *flags_ptr = (uint16_t *)&sdlt[stx].flags;
-		__atomic_store_n(flags_ptr, SF_USED | SF_TEXT | SF_DIDALLOC | SF_DIDMAKE | SF_DIDTEX, __ATOMIC_RELEASE);
+		atomic_store_explicit(&sdlt[stx].flags, SF_USED | SF_TEXT | SF_DIDALLOC | SF_DIDMAKE | SF_DIDTEX, memory_order_release);
 		sdlt[stx].text_color = text_color;
 		sdlt[stx].text_flags = text_flags;
 		sdlt[stx].text_font = text_font;
@@ -2414,8 +2405,7 @@ int sdl_tx_load(int sprite, int sink, int freeze, int scale, int cr, int cg, int
 
 		// Set flags with RELEASE to establish happens-before: workers reading flags with ACQUIRE
 		// will see all the above fields as initialized
-		uint16_t *flags_ptr = (uint16_t *)&sdlt[stx].flags;
-		__atomic_store_n(flags_ptr, SF_USED | SF_SPRITE, __ATOMIC_RELEASE);
+		atomic_store_explicit(&sdlt[stx].flags, SF_USED | SF_SPRITE, memory_order_release);
 
 		if (preload != 1) {
 			sdl_make(sdlt + stx, sdli + sprite, preload);
@@ -3537,8 +3527,7 @@ void sdl_pre_add(int attick, int sprite, signed char sink, unsigned char freeze,
 		}
 
 		// Mark as queued before adding to queue (protects from eviction)
-		uint16_t *flags_ptr = (uint16_t *)&sdlt[n].flags;
-		__atomic_fetch_or(flags_ptr, SF_INQUEUE, __ATOMIC_RELEASE);
+		atomic_fetch_or_explicit(&sdlt[n].flags, SF_INQUEUE, memory_order_release);
 
 		pre[pre_in].stx = n;
 		pre[pre_in].attick = attick;
@@ -3765,14 +3754,13 @@ int sdl_pre_worker(struct zip_handles *zips)
 
 	// We successfully claimed it - clear SF_INQUEUE since we're now processing it
 	// SF_CLAIMJOB is set by job_claimed(), so we just need to clear SF_INQUEUE
-	uint16_t *flags_ptr = (uint16_t *)&sdlt[stx].flags;
-	__atomic_fetch_and(flags_ptr, (uint16_t)~SF_INQUEUE, __ATOMIC_RELEASE);
+	atomic_fetch_and_explicit(&sdlt[stx].flags, (uint16_t)~SF_INQUEUE, memory_order_release);
 
 	// Ensure image is loaded via this worker's zip handles (thread-safe via state machine)
 	int sprite = sdlt[stx].sprite;
 	if (sdl_ic_load(sprite, zips) < 0) {
 		// Loading failed; mark as done (so we don't spin forever) but with no texture
-		__atomic_fetch_or(flags_ptr, SF_DIDALLOC | SF_DIDMAKE, __ATOMIC_RELEASE);
+		atomic_fetch_or_explicit(&sdlt[stx].flags, SF_DIDALLOC | SF_DIDMAKE, memory_order_release);
 		return 0;
 	}
 
@@ -3782,7 +3770,7 @@ int sdl_pre_worker(struct zip_handles *zips)
 
 	// Verify pixel was allocated
 	if (!sdlt[stx].pixel) {
-		__atomic_fetch_or(flags_ptr, SF_DIDALLOC | SF_DIDMAKE, __ATOMIC_RELEASE);
+		atomic_fetch_or_explicit(&sdlt[stx].flags, SF_DIDALLOC | SF_DIDMAKE, memory_order_release);
 		// Keep SF_CLAIMJOB set - it's cumulative and indicates work was started
 		return 0; // Failed, no work
 	}
@@ -3791,7 +3779,7 @@ int sdl_pre_worker(struct zip_handles *zips)
 
 	// Stage 2: Process pixel buffer (we just did Stage 1, so Stage 2 definitely isn't done)
 	sdl_make(sdlt + stx, sdli + sprite, 2);
-	__atomic_fetch_or(flags_ptr, SF_DIDMAKE, __ATOMIC_RELEASE);
+	atomic_fetch_or_explicit(&sdlt[stx].flags, SF_DIDMAKE, memory_order_release);
 	// Keep SF_CLAIMJOB set - it's cumulative and indicates work was started
 
 	return work; // Successfully processed a job
