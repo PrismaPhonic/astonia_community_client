@@ -27,6 +27,9 @@
 #include <ctype.h>
 #include <png.h>
 #include <zip.h>
+#if USE_MIMALLOC
+#include <mimalloc.h>
+#endif
 
 #ifdef _WIN32
 #include <direct.h>
@@ -76,6 +79,33 @@ void png_helper_read(png_structp ps, png_bytep buf, png_size_t len)
 	zip_fread(png_get_io_ptr(ps), buf, len);
 }
 
+// libpng custom allocator functions
+#if USE_MIMALLOC
+static png_voidp png_malloc_fn(png_structp png_ptr __attribute__((unused)), png_alloc_size_t size)
+{
+	return mi_malloc(size);
+}
+
+static void png_free_fn(png_structp png_ptr __attribute__((unused)), png_voidp ptr)
+{
+	if (ptr) {
+		mi_free(ptr);
+	}
+}
+#else
+static png_voidp png_malloc_fn(png_structp png_ptr __attribute__((unused)), png_alloc_size_t size)
+{
+	return malloc(size);
+}
+
+static void png_free_fn(png_structp png_ptr __attribute__((unused)), png_voidp ptr)
+{
+	if (ptr) {
+		free(ptr);
+	}
+}
+#endif
+
 int png_load_helper(struct png_helper *p)
 {
 	FILE *fp = NULL;
@@ -94,7 +124,7 @@ int png_load_helper(struct png_helper *p)
 		}
 	}
 
-	p->png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+	p->png_ptr = png_create_read_struct_2(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL, NULL, png_malloc_fn, png_free_fn);
 	if (!p->png_ptr) {
 		fclose(fp);
 		fprintf(stderr, "create read\n");
@@ -430,7 +460,8 @@ void write_png_file(char *filename, uint32_t *pixel, int width, int height, int 
 		abort();
 	}
 
-	png_structp png = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+	png_structp png =
+	    png_create_write_struct_2(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL, NULL, png_malloc_fn, png_free_fn);
 	if (!png) {
 		abort();
 	}

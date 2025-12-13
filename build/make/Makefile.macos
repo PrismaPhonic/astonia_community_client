@@ -54,12 +54,18 @@ ifeq ($(SDL_MIXER_LIBS),)
 endif
 
 SDL_CFLAGS=$(shell $(SDL_CONFIG) --cflags)
-CFLAGS=$(OPT) $(DEBUG) $(WARNING_FLAGS) -fno-omit-frame-pointer -flto -fvisibility=hidden $(SDL_CFLAGS) $(SDL_MIXER_CFLAGS) -Iinclude -Isrc $(ZIP_CFLAGS)
-CFLAGS_PIC=$(OPT) $(DEBUG) $(WARNING_FLAGS) -fPIC -fno-omit-frame-pointer -fvisibility=hidden $(SDL_CFLAGS) $(SDL_MIXER_CFLAGS) -Iinclude -Isrc $(ZIP_CFLAGS)
+# Default to using mimalloc unless USE_MIMALLOC=0 is set
+USE_MIMALLOC ?= 1
+
+CFLAGS=$(OPT) $(DEBUG) $(WARNING_FLAGS) -fno-omit-frame-pointer -flto -fvisibility=hidden $(SDL_CFLAGS) $(SDL_MIXER_CFLAGS) -Iinclude -Isrc $(ZIP_CFLAGS) -DUSE_MIMALLOC=$(USE_MIMALLOC)
+CFLAGS_PIC=$(OPT) $(DEBUG) $(WARNING_FLAGS) -fPIC -fno-omit-frame-pointer -fvisibility=hidden $(SDL_CFLAGS) $(SDL_MIXER_CFLAGS) -Iinclude -Isrc $(ZIP_CFLAGS) -DUSE_MIMALLOC=$(USE_MIMALLOC)
 LDFLAGS=$(OPT) $(DEBUG) -rdynamic -Wl,-rpath,@loader_path
 
 SDL_LIBS=$(shell $(SDL_CONFIG) --libs)
 LIBS = -lz -lpng $(ZIP_LIBS) $(SDL_MIXER_LIBS) -lm
+ifeq ($(USE_MIMALLOC),1)
+LIBS += -lmimalloc
+endif
 
 ASTONIA_NET_DIR=astonia_net
 # Detect macOS architecture
@@ -109,7 +115,7 @@ bin/anicopy:	src/helper/anicopy.c
 		$(CC) $(OPT) $(DEBUG) -Wall -o bin/anicopy src/helper/anicopy.c
 
 bin/convert:	src/helper/convert.c
-		$(CC) $(OPT) $(DEBUG) -Wall -DSTANDALONE $(ZIP_CFLAGS) -o bin/convert src/helper/convert.c -lpng $(ZIP_LIBS)
+		$(CC) $(OPT) $(DEBUG) -Wall -DSTANDALONE -DUSE_MIMALLOC=$(USE_MIMALLOC) $(ZIP_CFLAGS) -o bin/convert src/helper/convert.c -lpng $(ZIP_LIBS) $(if $(filter 1,$(USE_MIMALLOC)),-lmimalloc,)
 
 
 src/client/client.o:	src/client/client.c src/astonia.h src/client/client.h src/client/client_private.h src/sdl/sdl.h

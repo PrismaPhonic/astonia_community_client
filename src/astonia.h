@@ -4,7 +4,29 @@
 
 #include <stdint.h>
 #include <string.h>
+#include <stdlib.h>
 #include "dll.h"
+
+// Memory allocator selection: Use mimalloc by default, but can be disabled via USE_MIMALLOC=0 at build time
+// Address sanitizer builds should set USE_MIMALLOC=0
+#ifndef USE_MIMALLOC
+#define USE_MIMALLOC 1
+#endif
+
+#if USE_MIMALLOC
+#include <mimalloc.h>
+#define MALLOC  mi_malloc
+#define CALLOC  mi_calloc
+#define REALLOC mi_realloc
+#define FREE    mi_free
+#define STRDUP  mi_strdup
+#else
+#define MALLOC  malloc
+#define CALLOC  calloc
+#define REALLOC realloc
+#define FREE    free
+#define STRDUP  strdup
+#endif
 
 // Semantic type aliases for domain-specific values
 typedef uint32_t tick_t; // SDL ticks, timestamps

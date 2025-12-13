@@ -343,7 +343,7 @@ void *xmalloc(size_t size, uint8_t ID)
 
 	memptrused++;
 
-	mem = calloc(1, sizeof(struct memhead) + sizeof(memcheck) + size + sizeof(memcheck));
+	mem = CALLOC(1, sizeof(struct memhead) + sizeof(memcheck) + size + sizeof(memcheck));
 	if (!mem) {
 		fail("OUT OF MEMORY !!!");
 		return NULL;
@@ -455,7 +455,7 @@ void xfree(void *ptr)
 	update_mem_stats_remove(mem->ID, (size_t)mem->size);
 
 	// free
-	free(mem);
+	FREE(mem);
 }
 
 void xinfo(void *ptr)
@@ -514,7 +514,7 @@ void *xrealloc(void *ptr, size_t size, uint8_t ID)
 	update_mem_stats_remove(old_ID, old_size);
 
 	// realloc
-	struct memhead *new_mem = realloc(mem, sizeof(struct memhead) + sizeof(memcheck) + size + sizeof(memcheck));
+	struct memhead *new_mem = REALLOC(mem, sizeof(struct memhead) + sizeof(memcheck) + size + sizeof(memcheck));
 	if (!new_mem) {
 		// Restore counters since realloc failed
 		update_mem_stats_add(old_ID, old_size);
@@ -569,7 +569,7 @@ void *xrecalloc(void *ptr, size_t size, uint8_t ID)
 	update_mem_stats_remove(old_ID, old_size);
 
 	// realloc
-	struct memhead *new_mem = realloc(mem, sizeof(struct memhead) + sizeof(memcheck) + size + sizeof(memcheck));
+	struct memhead *new_mem = REALLOC(mem, sizeof(struct memhead) + sizeof(memcheck) + size + sizeof(memcheck));
 	if (!new_mem) {
 		// Restore counters since realloc failed
 		update_mem_stats_add(old_ID, old_size);
@@ -913,6 +913,12 @@ void determine_resolution(void)
 // main
 int main(int argc, char *argv[])
 {
+#if USE_MIMALLOC
+	// Configure SDL to use mimalloc for all its internal allocations
+	// This MUST be called before any SDL function, including SDL_GetPrefPath()
+	SDL_SetMemoryFunctions(MALLOC, CALLOC, REALLOC, FREE);
+#endif
+
 	int ret;
 	char buf[80];
 
