@@ -218,20 +218,20 @@ void dl_play(void)
 	dlused = 0;
 }
 
-void sdl_pre_add(tick_t attick, unsigned int sprite, signed char sink, unsigned char freeze, unsigned char scale,
-    char cr, char cg, char cb, char light, char sat, int c1, int c2, int c3, int shine, char ml, char ll, char rl,
-    char ul, char dl);
+void sdl_pre_add(unsigned int sprite, signed char sink, unsigned char freeze, unsigned char scale, char cr, char cg,
+    char cb, char light, char sat, int c1, int c2, int c3, int shine, char ml, char ll, char rl, char ul, char dl);
 
 void dl_prefetch(tick_t attick)
 {
 	void helper_add_dl(int attick, DL **dl, int dlused);
 	int d;
+	(void)attick; // Unused, kept for API compatibility
 
 	// helper_add_dl(attick,dlsort,dlused);
 
 	for (d = 0; d < dlused && !quit; d++) {
 		if (dlsort[d]->call == 0) {
-			sdl_pre_add(attick, dlsort[d]->renderfx.sprite, dlsort[d]->renderfx.sink, dlsort[d]->renderfx.freeze,
+			sdl_pre_add(dlsort[d]->renderfx.sprite, dlsort[d]->renderfx.sink, dlsort[d]->renderfx.freeze,
 			    dlsort[d]->renderfx.scale, dlsort[d]->renderfx.cr, dlsort[d]->renderfx.cg, dlsort[d]->renderfx.cb,
 			    dlsort[d]->renderfx.clight, dlsort[d]->renderfx.sat, dlsort[d]->renderfx.c1, dlsort[d]->renderfx.c2,
 			    dlsort[d]->renderfx.c3, dlsort[d]->renderfx.shine, dlsort[d]->renderfx.ml, dlsort[d]->renderfx.ll,

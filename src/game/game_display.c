@@ -1397,6 +1397,6 @@ void prefetch_game(tick_t attick)
 	dl_prefetch(attick);
 
 #ifdef TICKPRINT
-	printf("Prefetch %d\n", attick);
+	printf("Prefetch %u\n", attick);
 #endif
 }
