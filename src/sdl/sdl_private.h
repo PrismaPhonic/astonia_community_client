@@ -268,7 +268,7 @@ SDL_Texture *sdl_maketext(const char *text, struct renderfont *font, uint32_t co
 // ============================================================================
 // Internal functions from sdl_core.c
 // ============================================================================
-int sdl_pre_worker(void);
+int if_single_thread_process_one_job(void);
 
 // ============================================================================
 // Test-only functions (compiled only when UNIT_TEST is defined)
