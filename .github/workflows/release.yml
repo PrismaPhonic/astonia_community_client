@@ -24,18 +24,33 @@ jobs:
       - name: Checkout LFS objects
         run: git lfs pull
 
+      - name: Install SDL3
+        uses: libsdl-org/setup-sdl@main
+        with:
+          install-linux-dependencies: true
+          version: 3-latest
+          version-sdl-image: 3-latest
+
       - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             build-essential \
             clang \
-            libsdl2-dev \
-            libsdl2-mixer-dev \
             libpng-dev \
             libzip-dev \
             zlib1g-dev \
-            libmimalloc-dev
+            libmimalloc-dev \
+            unzip
+
+      - name: Install vendored SDL3_mixer
+        run: |
+          cd /tmp
+          unzip -q $GITHUB_WORKSPACE/vendored/SDL3_mixer-linux-x64.zip
+          tar -xzf SDL3_mixer-3.1.0-linux-x64.tar.gz
+          sudo cp -r SDL3_mixer-3.1.0-linux-x64/include/* /usr/include/
+          sudo cp -r SDL3_mixer-3.1.0-linux-x64/lib/* /usr/lib/
+          rm -rf SDL3_mixer-3.1.0-linux-x64*
 
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -95,13 +110,23 @@ jobs:
           update: true
           install: >
             mingw-w64-clang-x86_64-clang
-            mingw-w64-clang-x86_64-SDL2
+            mingw-w64-clang-x86_64-sdl3
             mingw-w64-clang-x86_64-libpng
-            mingw-w64-clang-x86_64-SDL2_mixer
             mingw-w64-clang-x86_64-libzip
             mingw-w64-clang-x86_64-dwarfstack
             mingw-w64-clang-x86_64-mimalloc
             make
+            unzip
+
+      - name: Install vendored SDL3_mixer
+        run: |
+          cd /tmp
+          unzip -q $GITHUB_WORKSPACE/vendored/SDL3_mixer-mingw64.zip
+          tar -xzf SDL3_mixer-3.1.0-windows-mingw-x64.tar.gz
+          cp -r SDL3_mixer-3.1.0-windows-mingw-x64/include/* /clang64/include/
+          cp -r SDL3_mixer-3.1.0-windows-mingw-x64/lib/* /clang64/lib/
+          cp -r SDL3_mixer-3.1.0-windows-mingw-x64/bin/* /clang64/bin/
+          rm -rf SDL3_mixer-3.1.0-windows-mingw-x64*
 
       - name: Build release
         run: make windows
@@ -140,7 +165,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          brew install sdl2 sdl2_mixer libzip zlib mimalloc imagemagick
+          brew install sdl3 libzip zlib mimalloc imagemagick
 
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -174,7 +199,7 @@ jobs:
         run: |
           mkdir -p private_keys
           echo '${{ secrets.APP_STORE_CONNECT_KEY }}' > "private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8"
-      
+
       - name: Install App Store Connect API key JSON
         run: |
           echo '${{ secrets.APP_STORE_CONNECT_KEY_JSON }}' > private_keys/appstore_key.json
@@ -243,7 +268,6 @@ jobs:
           app_store_connect_api_key_json_file: private_keys/appstore_key.json
           app_store_connect_api_issuer: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
           app_store_connect_api_key: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-
 
       - name: Remove unsigned DMG
         run: rm -f distrib/Astonia-macOS-unsigned.dmg

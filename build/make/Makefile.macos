@@ -52,6 +52,7 @@ ifeq ($(ZIP_LIBS),)
     endif
 endif
 
+# SDL3_mixer: Use pkg-config if available, otherwise use brew prefix
 SDL_MIXER_CFLAGS:=$(shell $(PKG_CONFIG) --cflags SDL3_mixer 2>/dev/null)
 SDL_MIXER_LIBS:=$(shell $(PKG_CONFIG) --libs SDL3_mixer 2>/dev/null)
 ifeq ($(SDL_MIXER_CFLAGS),)
@@ -190,6 +191,23 @@ src/game/memory.o: src/game/memory.c src/game/memory.h src/astonia.h src/sdl/sdl
 
 src/game/memory_macos.o: src/game/memory_macos.c
 		$(CC) $(CFLAGS_PIC) -c -o $@ $<
+
+# Extract and install vendored SDL3_mixer to system directories
+# Uses $(shell) to run during Makefile parsing
+$(shell \
+	if [ ! -f "$(BREW_PREFIX)/include/SDL3_mixer/SDL_mixer.h" ]; then \
+		echo "Installing vendored SDL3_mixer to $(BREW_PREFIX)..." >&2; \
+		cd /tmp && \
+		unzip -q $(CURDIR)/vendored/SDL3_mixer-macos.zip && \
+		tar -xzf SDL3_mixer-3.1.0-darwin-arm64.tar.gz && \
+		cd SDL3_mixer-3.1.0-darwin-arm64 && \
+		cp -r include/* $(BREW_PREFIX)/include/ && \
+		cp -r lib/* $(BREW_PREFIX)/lib/ && \
+		cd /tmp && \
+		rm -rf SDL3_mixer-3.1.0-darwin-arm64* && \
+		echo "SDL3_mixer installed to $(BREW_PREFIX)" >&2; \
+	fi \
+)
 
 clean:
 	@echo "Cleaning build artifacts..."

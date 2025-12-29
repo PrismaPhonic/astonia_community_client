@@ -1,7 +1,11 @@
-FROM archlinux:latest
+FROM cachyos/cachyos:latest
 
 # Full Windows development environment with Clang
 # Use this for development, debugging, and advanced tooling
+
+# Upgrade system with auto-resolve enabled
+# Use --needed to skip already-installed packages and avoid 404 errors on old versions
+RUN pacman -Syyu --noconfirm --needed --ask=4 --overwrite="*"
 
 # Configure MSYS2 repositories
 RUN cat >> /etc/pacman.conf <<EOF
@@ -16,7 +20,7 @@ Server = https://repo.msys2.org/mingw/mingw64
 EOF
 
 # Install development tools and utilities
-RUN pacman -Syu --noconfirm \
+RUN pacman -S --noconfirm --needed --ask=4 --overwrite="*" \
     base-devel \
     git \
     make \
@@ -38,7 +42,7 @@ RUN pacman -Syu --noconfirm \
     && pacman -Scc --noconfirm
 
 # Install comprehensive Clang/LLVM toolchain
-RUN pacman -S --noconfirm \
+RUN pacman -S --noconfirm --needed --ask=4 --overwrite="*" \
     mingw-w64-clang-x86_64-clang \
     mingw-w64-clang-x86_64-lld \
     mingw-w64-clang-x86_64-llvm \
@@ -50,7 +54,7 @@ RUN pacman -S --noconfirm \
     && pacman -Scc --noconfirm
 
 # Install development and analysis tools
-RUN pacman -S --noconfirm \
+RUN pacman -S --noconfirm --needed --ask=4 --overwrite="*" \
     mingw-w64-clang-x86_64-clang-analyzer \
     mingw-w64-clang-x86_64-clang-tools-extra \
     mingw-w64-clang-x86_64-mlir \
@@ -58,16 +62,14 @@ RUN pacman -S --noconfirm \
     || true  # Some packages might not exist
 
 # Install libraries (both clang64 and mingw64 for flexibility)
-RUN pacman -S --noconfirm \
-    mingw-w64-clang-x86_64-SDL2 \
-    mingw-w64-clang-x86_64-SDL2_mixer \
+RUN pacman -S --noconfirm --needed --ask=4 --overwrite="*" \
+    mingw-w64-clang-x86_64-sdl3 \
     mingw-w64-clang-x86_64-zlib \
     mingw-w64-clang-x86_64-libpng \
     mingw-w64-clang-x86_64-libzip \
     mingw-w64-clang-x86_64-dwarfstack \
     mingw-w64-clang-x86_64-mimalloc \
-    mingw-w64-x86_64-SDL2 \
-    mingw-w64-x86_64-SDL2_mixer \
+    mingw-w64-x86_64-sdl3 \
     mingw-w64-x86_64-zlib \
     mingw-w64-x86_64-libpng \
     mingw-w64-x86_64-libzip \
@@ -75,8 +77,25 @@ RUN pacman -S --noconfirm \
     mingw-w64-x86_64-mimalloc \
     && pacman -Scc --noconfirm
 
+# Install vendored SDL3_mixer (not yet available in MSYS2 repos)
+COPY vendored/SDL3_mixer-mingw64.zip /tmp/
+RUN cd /tmp && \
+    unzip -q SDL3_mixer-mingw64.zip && \
+    tar -xzf SDL3_mixer-3.1.0-windows-mingw-x64.tar.gz && \
+    cd SDL3_mixer-3.1.0-windows-mingw-x64 && \
+    cp -r include/SDL3_mixer /clang64/include/ && \
+    cp lib/libSDL3_mixer.dll.a /clang64/lib/ && \
+    cp bin/SDL3_mixer.dll /clang64/bin/ && \
+    cp lib/pkgconfig/sdl3-mixer.pc /clang64/lib/pkgconfig/ && \
+    cp -r include/SDL3_mixer /mingw64/include/ && \
+    cp lib/libSDL3_mixer.dll.a /mingw64/lib/ && \
+    cp bin/SDL3_mixer.dll /mingw64/bin/ && \
+    cp lib/pkgconfig/sdl3-mixer.pc /mingw64/lib/pkgconfig/ && \
+    cd / && \
+    rm -rf /tmp/SDL3_mixer*
+
 # Install GCC toolchain for comparison/fallback
-RUN pacman -S --noconfirm \
+RUN pacman -S --noconfirm --needed --ask=4 --overwrite="*" \
     mingw-w64-gcc \
     mingw-w64-binutils \
     mingw-w64-headers \

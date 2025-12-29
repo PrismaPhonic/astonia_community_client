@@ -1,27 +1,28 @@
-FROM archlinux:latest
+FROM cachyos/cachyos:latest
 
 # Linux development environment with clang-tidy and analysis tools
 # Use this for development, debugging, and code analysis
 
+# Upgrade system with auto-resolve enabled
+# Use --needed to skip already-installed packages and avoid 404 errors on old versions
+RUN pacman -Syyu --noconfirm --needed --ask=4 --overwrite="*"
+
 # Install basic dependencies and development tools
-RUN pacman -Syu --noconfirm \
+RUN pacman -S --noconfirm --needed --ask=4 --overwrite="*" \
     curl \
     wget \
     git \
     base-devel \
-    sdl3 \
-    sdl2-compat \
-    sdl2_mixer \
     libpng \
     libzip \
     zlib \
-    mimalloc \
     zig \
+    unzip \
+    sdl3 \
     && pacman -Scc --noconfirm
 
 # Install Clang tooling for analysis
-RUN pacman -Syy --noconfirm && \
-    pacman -S --noconfirm \
+RUN pacman -S --noconfirm --needed --ask=4 --overwrite="*" \
     clang \
     clang-tools-extra \
     llvm \
@@ -38,9 +39,17 @@ RUN pacman -Syy --noconfirm && \
 
 # Install additional code quality tools
 RUN pip install --break-system-packages --no-cache-dir gcovr && \
-    pacman -Syy --noconfirm && \
-    pacman -S --noconfirm lcov && \
+    pacman -S --noconfirm --needed --ask=4 --overwrite="*" lcov && \
     pacman -Scc --noconfirm
+
+# Install vendored SDL3_mixer (until official release)
+COPY vendored/SDL3_mixer-linux-x64.zip /tmp/SDL3_mixer.zip
+RUN cd /tmp && \
+    unzip SDL3_mixer.zip && \
+    tar -xzf SDL3_mixer-3.1.0-linux-x64.tar.gz && \
+    cp -r SDL3_mixer-3.1.0-linux-x64/include/* /usr/include/ && \
+    cp -r SDL3_mixer-3.1.0-linux-x64/lib/* /usr/lib/ && \
+    rm -rf /tmp/SDL3_mixer*
 
 # Install Rust
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
