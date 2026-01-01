@@ -10,17 +10,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 
 #include "../astonia.h" // Must come first for tick_t
 #include "sdl_private.h"
 
 // Forward declarations for test-exposed functions
-extern SDL_atomic_t worker_quit;
+extern SDL_AtomicInt worker_quit;
 extern SDL_Thread **worker_threads;
 extern struct zip_handles *worker_zips;
 extern int sdl_multi;
-extern SDL_sem *prework;
+extern SDL_Semaphore *prework;
 
 // ============================================================================
 // State initialization helpers
@@ -78,8 +78,8 @@ static void sdl_zero_state_for_tests(void)
 
 int sdl_init_for_tests(void)
 {
-	// Minimal SDL init for timers/threads only
-	if (SDL_Init(SDL_INIT_TIMER | SDL_INIT_EVENTS) != 0) {
+	// Minimal SDL init for tests (SDL3 doesn't have SDL_INIT_TIMER or SDL_INIT_EVENTS)
+	if (!SDL_Init(0)) {
 		fprintf(stderr, "sdl_init_for_tests: SDL_Init failed: %s\n", SDL_GetError());
 		return 0;
 	}
@@ -119,7 +119,7 @@ int sdl_init_for_tests(void)
 		return 0;
 	}
 
-	SDL_AtomicSet(&worker_quit, 0);
+	SDL_SetAtomicInt(&worker_quit, 0);
 	worker_threads = NULL;
 
 	sdl_zero_state_for_tests();
@@ -156,7 +156,7 @@ int sdl_init_for_tests_with_workers(int worker_count)
 	// Don't allocate zip handles for tests - workers will use NULL
 	worker_zips = NULL;
 
-	SDL_AtomicSet(&worker_quit, 0);
+	SDL_SetAtomicInt(&worker_quit, 0);
 
 	for (i = 0; i < worker_count; i++) {
 		char name[64];
@@ -180,17 +180,17 @@ void sdl_shutdown_for_tests(void)
 
 	// Stop worker threads
 	if (sdl_multi && worker_threads) {
-		SDL_AtomicSet(&worker_quit, 1);
+		SDL_SetAtomicInt(&worker_quit, 1);
 
 		// Also signal the job queue condition variable (for any waiting on cond)
 		SDL_LockMutex(g_tex_jobs.mutex);
-		SDL_CondBroadcast(g_tex_jobs.cond);
+		SDL_BroadcastCondition(g_tex_jobs.cond);
 		SDL_UnlockMutex(g_tex_jobs.mutex);
 
 		// Wake up all workers from semaphore wait
-		// Each worker needs one semaphore post to wake from SDL_SemWait
+		// Each worker needs one semaphore post to wake from SDL_WaitSemaphore
 		for (i = 0; i < sdl_multi; i++) {
-			SDL_SemPost(prework);
+			SDL_SignalSemaphore(prework);
 		}
 
 		// Wait for all workers to exit
@@ -487,19 +487,20 @@ int sdl_check_invariants_for_tests(void)
 static int dummy_texture;
 
 // Stub: Create texture (would normally require GPU renderer)
-SDL_Texture *SDL_CreateTexture(SDL_Renderer *renderer __attribute__((unused)), Uint32 format __attribute__((unused)),
-    int access __attribute__((unused)), int w __attribute__((unused)), int h __attribute__((unused)))
+SDL_Texture *SDL_CreateTexture(SDL_Renderer *renderer __attribute__((unused)),
+    SDL_PixelFormat format __attribute__((unused)), SDL_TextureAccess access __attribute__((unused)),
+    int w __attribute__((unused)), int h __attribute__((unused)))
 {
 	// Return non-NULL pointer (cache code just checks != NULL)
 	return (SDL_Texture *)&dummy_texture;
 }
 
 // Stub: Update texture with pixel data
-int SDL_UpdateTexture(SDL_Texture *texture __attribute__((unused)), const SDL_Rect *rect __attribute__((unused)),
+bool SDL_UpdateTexture(SDL_Texture *texture __attribute__((unused)), const SDL_Rect *rect __attribute__((unused)),
     const void *pixels __attribute__((unused)), int pitch __attribute__((unused)))
 {
 	// Success - we don't actually upload to GPU
-	return 0;
+	return true;
 }
 
 // Stub: Destroy texture

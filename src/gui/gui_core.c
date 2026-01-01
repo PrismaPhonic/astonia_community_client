@@ -7,7 +7,8 @@
 
 #include <inttypes.h>
 #include <time.h>
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_stdinc.h>
 
 #include "astonia.h"
 #include "gui/gui.h"
@@ -51,7 +52,7 @@ DLL_EXPORT unsigned short int lightbluecolor, bluecolor, darkbluecolor;
 DLL_EXPORT unsigned short int textcolor;
 DLL_EXPORT unsigned short int lightorangecolor, orangecolor, darkorangecolor;
 
-unsigned int now;
+Uint64 now;
 
 int cur_cursor = 0;
 int mousex = 300, mousey = 300, vk_rbut, vk_lbut, shift_override = 0, control_override = 0;
@@ -60,7 +61,7 @@ int mousedx, mousedy;
 int vk_item, vk_char, vk_spell;
 
 int vk_special = 0;
-unsigned int vk_special_time = 0;
+Uint64 vk_special_time = 0;
 
 // globals wea
 
@@ -246,7 +247,7 @@ void main_exit(void)
 
 static void flip_at(unsigned int t)
 {
-	unsigned int tnow;
+	Uint64 tnow;
 	int sdl_pre_do(void);
 
 	do {
@@ -280,7 +281,7 @@ int main_loop(void)
 	while (!quit) {
 		now = SDL_GetTicks();
 
-		start = (long long)SDL_GetTicks64();
+		start = (long long)SDL_GetTicks();
 		poll_network();
 
 		// synchronise frames and ticks if at the same speed
@@ -303,8 +304,8 @@ int main_loop(void)
 			if (timediff < 0 ||
 			    nexttick <= nextframe) { // do ticks when they are due, or before the corresponding frame is shown
 				do_one_tick = 1;
-				gui_ticktime = SDL_GetTicks64() - gui_last_tick;
-				gui_last_tick = SDL_GetTicks64();
+				gui_ticktime = SDL_GetTicks() - gui_last_tick;
+				gui_last_tick = SDL_GetTicks();
 				do_tick();
 				ltick++;
 
@@ -323,14 +324,14 @@ int main_loop(void)
 		} else {
 			timediff = 1;
 		}
-		gui_time_network += (uint64_t)(SDL_GetTicks64() - (Uint64)start);
+		gui_time_network += (uint64_t)(SDL_GetTicks() - (Uint64)start);
 
 		if (timediff > -MPF / 2) {
 #ifdef TICKPRINT
 			printf("Display tick %u\n", tick);
 #endif
-			gui_frametime = SDL_GetTicks64() - gui_last_frame;
-			gui_last_frame = SDL_GetTicks64();
+			gui_frametime = SDL_GetTicks() - gui_last_frame;
+			gui_last_frame = SDL_GetTicks();
 
 			if (sdl_is_shown() && (!(tick & 3) || !game_slowdown || sockstate != 4)) {
 				sdl_clear();
@@ -525,13 +526,13 @@ int gui_keymode(void)
 	int ret = 0;
 
 	km = SDL_GetModState();
-	if (km & KMOD_SHIFT) {
+	if (km & SDL_KMOD_SHIFT) {
 		ret |= SDL_KEYM_SHIFT;
 	}
-	if (km & KMOD_CTRL) {
+	if (km & SDL_KMOD_CTRL) {
 		ret |= SDL_KEYM_CTRL;
 	}
-	if (km & KMOD_ALT) {
+	if (km & SDL_KMOD_ALT) {
 		ret |= SDL_KEYM_ALT;
 	}
 

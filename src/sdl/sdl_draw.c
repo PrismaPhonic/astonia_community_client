@@ -10,7 +10,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 
 #include "dll.h"
 #include "astonia.h"
@@ -39,11 +39,14 @@
 static void sdl_blit_tex(
     SDL_Texture *tex, int sx, int sy, int clipsx, int clipsy, int clipex, int clipey, int x_offset, int y_offset)
 {
-	int addx = 0, addy = 0, dx, dy;
-	SDL_Rect dr, sr;
-	Uint64 start = SDL_GetTicks64();
+	int addx = 0, addy = 0;
+	float f_dx, f_dy;
+	SDL_FRect dr, sr;
+	Uint64 start = SDL_GetTicks();
 
-	SDL_QueryTexture(tex, NULL, NULL, &dx, &dy);
+	SDL_GetTextureSize(tex, &f_dx, &f_dy);
+	int dx = (int)f_dx;
+	int dy = (int)f_dy;
 
 	dx /= sdl_scale;
 	dy /= sdl_scale;
@@ -66,19 +69,19 @@ static void sdl_blit_tex(
 	dx *= sdl_scale;
 	dy *= sdl_scale;
 
-	dr.x = (sx + x_offset) * sdl_scale;
-	dr.w = dx;
-	dr.y = (sy + y_offset) * sdl_scale;
-	dr.h = dy;
+	dr.x = (float)((sx + x_offset) * sdl_scale);
+	dr.w = (float)dx;
+	dr.y = (float)((sy + y_offset) * sdl_scale);
+	dr.h = (float)dy;
 
-	sr.x = addx * sdl_scale;
-	sr.w = dx;
-	sr.y = addy * sdl_scale;
-	sr.h = dy;
+	sr.x = (float)(addx * sdl_scale);
+	sr.w = (float)dx;
+	sr.y = (float)(addy * sdl_scale);
+	sr.h = (float)dy;
 
-	SDL_RenderCopy(sdlren, tex, &sr, &dr);
+	SDL_RenderTexture(sdlren, tex, &sr, &dr);
 
-	sdl_time_blit += (long long)(SDL_GetTicks64() - start);
+	sdl_time_blit += (long long)(SDL_GetTicks() - start);
 }
 
 void sdl_blit(
@@ -95,7 +98,7 @@ SDL_Texture *sdl_maketext(const char *text, struct renderfont *font, uint32_t co
 	unsigned char *rawrun;
 	int x, y = 0, sizex, sizey = 0, sx = 0;
 	const char *c, *otext = text;
-	Uint64 start = SDL_GetTicks64();
+	Uint64 start = SDL_GetTicks();
 
 	for (sizex = 0, c = text; *c; c++) {
 		sizex += font[(unsigned char)*c].dim * sdl_scale;
@@ -157,9 +160,9 @@ SDL_Texture *sdl_maketext(const char *text, struct renderfont *font, uint32_t co
 	}
 
 	sizey++;
-	sdl_time_text += (long long)(SDL_GetTicks64() - start);
+	sdl_time_text += (long long)(SDL_GetTicks() - start);
 
-	start = SDL_GetTicks64();
+	start = SDL_GetTicks();
 	SDL_Texture *texture = SDL_CreateTexture(sdlren, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, sizex, sizey);
 	if (texture) {
 		SDL_UpdateTexture(texture, NULL, pixel, (int)((size_t)sizex * sizeof(uint32_t)));
@@ -172,7 +175,7 @@ SDL_Texture *sdl_maketext(const char *text, struct renderfont *font, uint32_t co
 #else
 	xfree(pixel);
 #endif
-	sdl_time_tex += SDL_GetTicks64() - start;
+	sdl_time_tex += SDL_GetTicks() - start;
 
 	return texture;
 }
@@ -227,7 +230,7 @@ void sdl_rect(int sx, int sy, int ex, int ey, unsigned short int color, int clip
     int x_offset, int y_offset)
 {
 	int r, g, b, a;
-	SDL_Rect rc;
+	SDL_FRect rc;
 
 	r = R16TO32(color);
 	g = G16TO32(color);
@@ -251,10 +254,10 @@ void sdl_rect(int sx, int sy, int ex, int ey, unsigned short int color, int clip
 		return;
 	}
 
-	rc.x = (sx + x_offset) * sdl_scale;
-	rc.w = (ex - sx) * sdl_scale;
-	rc.y = (sy + y_offset) * sdl_scale;
-	rc.h = (ey - sy) * sdl_scale;
+	rc.x = (float)((sx + x_offset) * sdl_scale);
+	rc.w = (float)((ex - sx) * sdl_scale);
+	rc.y = (float)((sy + y_offset) * sdl_scale);
+	rc.h = (float)((ey - sy) * sdl_scale);
 
 	SDL_SetRenderDrawColor(sdlren, (Uint8)r, (Uint8)g, (Uint8)b, (Uint8)a);
 	SDL_RenderFillRect(sdlren, &rc);
@@ -264,7 +267,7 @@ void sdl_shaded_rect(int sx, int sy, int ex, int ey, unsigned short int color, u
     int clipsy, int clipex, int clipey, int x_offset, int y_offset)
 {
 	int r, g, b, a;
-	SDL_Rect rc;
+	SDL_FRect rc;
 
 	r = R16TO32(color);
 	g = G16TO32(color);
@@ -288,10 +291,10 @@ void sdl_shaded_rect(int sx, int sy, int ex, int ey, unsigned short int color, u
 		return;
 	}
 
-	rc.x = (sx + x_offset) * sdl_scale;
-	rc.w = (ex - sx) * sdl_scale;
-	rc.y = (sy + y_offset) * sdl_scale;
-	rc.h = (ey - sy) * sdl_scale;
+	rc.x = (float)((sx + x_offset) * sdl_scale);
+	rc.w = (float)((ex - sx) * sdl_scale);
+	rc.y = (float)((sy + y_offset) * sdl_scale);
+	rc.h = (float)((ey - sy) * sdl_scale);
 
 	SDL_SetRenderDrawColor(sdlren, (Uint8)r, (Uint8)g, (Uint8)b, (Uint8)a);
 	SDL_SetRenderDrawBlendMode(sdlren, SDL_BLENDMODE_BLEND);
@@ -301,7 +304,7 @@ void sdl_shaded_rect(int sx, int sy, int ex, int ey, unsigned short int color, u
 void sdl_pixel(int x, int y, unsigned short color, int x_offset, int y_offset)
 {
 	int r, g, b, a, i;
-	SDL_Point pt[16];
+	SDL_FPoint pt[16];
 
 	r = R16TO32(color);
 	g = G16TO32(color);
@@ -311,80 +314,80 @@ void sdl_pixel(int x, int y, unsigned short color, int x_offset, int y_offset)
 	SDL_SetRenderDrawColor(sdlren, (Uint8)r, (Uint8)g, (Uint8)b, (Uint8)a);
 	switch (sdl_scale) {
 	case 1:
-		SDL_RenderDrawPoint(sdlren, x + x_offset, y + y_offset);
+		SDL_RenderPoint(sdlren, (float)(x + x_offset), (float)(y + y_offset));
 		return;
 	case 2:
-		pt[0].x = (x + x_offset) * sdl_scale;
-		pt[0].y = (y + y_offset) * sdl_scale;
-		pt[1].x = pt[0].x + 1;
+		pt[0].x = (float)((x + x_offset) * sdl_scale);
+		pt[0].y = (float)((y + y_offset) * sdl_scale);
+		pt[1].x = pt[0].x + 1.0f;
 		pt[1].y = pt[0].y;
 		pt[2].x = pt[0].x;
-		pt[2].y = pt[0].y + 1;
-		pt[3].x = pt[0].x + 1;
-		pt[3].y = pt[0].y + 1;
+		pt[2].y = pt[0].y + 1.0f;
+		pt[3].x = pt[0].x + 1.0f;
+		pt[3].y = pt[0].y + 1.0f;
 		i = 4;
 		break;
 	case 3:
-		pt[0].x = (x + x_offset) * sdl_scale;
-		pt[0].y = (y + y_offset) * sdl_scale;
-		pt[1].x = pt[0].x + 1;
+		pt[0].x = (float)((x + x_offset) * sdl_scale);
+		pt[0].y = (float)((y + y_offset) * sdl_scale);
+		pt[1].x = pt[0].x + 1.0f;
 		pt[1].y = pt[0].y;
 		pt[2].x = pt[0].x;
-		pt[2].y = pt[0].y + 1;
-		pt[3].x = pt[0].x + 1;
-		pt[3].y = pt[0].y + 1;
-		pt[4].x = pt[0].x + 2;
+		pt[2].y = pt[0].y + 1.0f;
+		pt[3].x = pt[0].x + 1.0f;
+		pt[3].y = pt[0].y + 1.0f;
+		pt[4].x = pt[0].x + 2.0f;
 		pt[4].y = pt[0].y;
 		pt[5].x = pt[0].x;
-		pt[5].y = pt[0].y + 2;
-		pt[6].x = pt[0].x + 2;
-		pt[6].y = pt[0].y + 2;
-		pt[7].x = pt[0].x + 2;
-		pt[7].y = pt[0].y + 1;
-		pt[8].x = pt[0].x + 1;
-		pt[8].y = pt[0].y + 2;
+		pt[5].y = pt[0].y + 2.0f;
+		pt[6].x = pt[0].x + 2.0f;
+		pt[6].y = pt[0].y + 2.0f;
+		pt[7].x = pt[0].x + 2.0f;
+		pt[7].y = pt[0].y + 1.0f;
+		pt[8].x = pt[0].x + 1.0f;
+		pt[8].y = pt[0].y + 2.0f;
 		i = 9;
 		break;
 	case 4:
-		pt[0].x = (x + x_offset) * sdl_scale;
-		pt[0].y = (y + y_offset) * sdl_scale;
-		pt[1].x = pt[0].x + 1;
+		pt[0].x = (float)((x + x_offset) * sdl_scale);
+		pt[0].y = (float)((y + y_offset) * sdl_scale);
+		pt[1].x = pt[0].x + 1.0f;
 		pt[1].y = pt[0].y;
 		pt[2].x = pt[0].x;
-		pt[2].y = pt[0].y + 1;
-		pt[3].x = pt[0].x + 1;
-		pt[3].y = pt[0].y + 1;
-		pt[4].x = pt[0].x + 2;
+		pt[2].y = pt[0].y + 1.0f;
+		pt[3].x = pt[0].x + 1.0f;
+		pt[3].y = pt[0].y + 1.0f;
+		pt[4].x = pt[0].x + 2.0f;
 		pt[4].y = pt[0].y;
 		pt[5].x = pt[0].x;
-		pt[5].y = pt[0].y + 2;
-		pt[6].x = pt[0].x + 2;
-		pt[6].y = pt[0].y + 2;
-		pt[7].x = pt[0].x + 2;
-		pt[7].y = pt[0].y + 1;
-		pt[8].x = pt[0].x + 1;
-		pt[8].y = pt[0].y + 2;
-		pt[9].x = pt[0].x + 3;
+		pt[5].y = pt[0].y + 2.0f;
+		pt[6].x = pt[0].x + 2.0f;
+		pt[6].y = pt[0].y + 2.0f;
+		pt[7].x = pt[0].x + 2.0f;
+		pt[7].y = pt[0].y + 1.0f;
+		pt[8].x = pt[0].x + 1.0f;
+		pt[8].y = pt[0].y + 2.0f;
+		pt[9].x = pt[0].x + 3.0f;
 		pt[9].y = pt[0].y;
-		pt[10].x = pt[0].x + 3;
-		pt[10].y = pt[0].y + 1;
-		pt[11].x = pt[0].x + 3;
-		pt[11].y = pt[0].y + 2;
-		pt[12].x = pt[0].x + 3;
-		pt[12].y = pt[0].y + 3;
+		pt[10].x = pt[0].x + 3.0f;
+		pt[10].y = pt[0].y + 1.0f;
+		pt[11].x = pt[0].x + 3.0f;
+		pt[11].y = pt[0].y + 2.0f;
+		pt[12].x = pt[0].x + 3.0f;
+		pt[12].y = pt[0].y + 3.0f;
 		pt[13].x = pt[0].x;
-		pt[13].y = pt[0].y + 3;
-		pt[14].x = pt[0].x + 1;
-		pt[14].y = pt[0].y + 3;
-		pt[15].x = pt[0].x + 2;
-		pt[15].y = pt[0].y + 3;
+		pt[13].y = pt[0].y + 3.0f;
+		pt[14].x = pt[0].x + 1.0f;
+		pt[14].y = pt[0].y + 3.0f;
+		pt[15].x = pt[0].x + 2.0f;
+		pt[15].y = pt[0].y + 3.0f;
 		i = 16;
 		break;
 	default:
 		warn("unsupported scale %d in sdl_pixel()", sdl_scale);
 		return;
 	}
-	SDL_RenderDrawPoints(sdlren, pt, i);
+	SDL_RenderPoints(sdlren, pt, i);
 }
 
 void sdl_line(int fx, int fy, int tx, int ty, unsigned short color, int clipsx, int clipsy, int clipex, int clipey,
@@ -430,7 +433,8 @@ void sdl_line(int fx, int fy, int tx, int ty, unsigned short color, int clipsx, 
 
 	SDL_SetRenderDrawColor(sdlren, (Uint8)r, (Uint8)g, (Uint8)b, (Uint8)a);
 	// TODO: This is a thinner line when scaled up. It looks surprisingly good. Maybe keep it this way?
-	SDL_RenderDrawLine(sdlren, fx * sdl_scale, fy * sdl_scale, tx * sdl_scale, ty * sdl_scale);
+	SDL_RenderLine(
+	    sdlren, (float)(fx * sdl_scale), (float)(fy * sdl_scale), (float)(tx * sdl_scale), (float)(ty * sdl_scale));
 }
 
 void sdl_bargraph_add(int dx, unsigned char *data, int val)
@@ -450,8 +454,8 @@ void sdl_bargraph(int sx, int sy, int dx, unsigned char *data, int x_offset, int
 			SDL_SetRenderDrawColor(sdlren, 80, 255, 80, 127);
 		}
 
-		SDL_RenderDrawLine(sdlren, (sx + n + x_offset) * sdl_scale, (sy + y_offset) * sdl_scale,
-		    (sx + n + x_offset) * sdl_scale, (sy - data[n] + y_offset) * sdl_scale);
+		SDL_RenderLine(sdlren, (float)((sx + n + x_offset) * sdl_scale), (float)((sy + y_offset) * sdl_scale),
+		    (float)((sx + n + x_offset) * sdl_scale), (float)((sy - data[n] + y_offset) * sdl_scale));
 	}
 }
 
@@ -461,7 +465,7 @@ void sdl_render_circle(int32_t centreX, int32_t centreY, int32_t radius, uint32_
 // Formula: ((radius * 8 * 35 / 49) + (8 - 1)) & -8
 // For radius=2000: ((2000 * 8 * 35 / 49) + 7) & -8 = 11428 & -8 = 11424
 #define MAX_CIRCLE_PTS 11424
-	SDL_Point pts[MAX_CIRCLE_PTS];
+	SDL_FPoint pts[MAX_CIRCLE_PTS];
 	int32_t pts_size = ((radius * 8 * 35 / 49) + (8 - 1)) & -8;
 	if (pts_size > MAX_CIRCLE_PTS) {
 		pts_size = MAX_CIRCLE_PTS;
@@ -479,29 +483,29 @@ void sdl_render_circle(int32_t centreX, int32_t centreY, int32_t radius, uint32_
 		if (dC + 8 > pts_size) {
 			break;
 		}
-		pts[dC].x = centreX + x;
-		pts[dC].y = centreY - y;
+		pts[dC].x = (float)(centreX + x);
+		pts[dC].y = (float)(centreY - y);
 		dC++;
-		pts[dC].x = centreX + x;
-		pts[dC].y = centreY + y;
+		pts[dC].x = (float)(centreX + x);
+		pts[dC].y = (float)(centreY + y);
 		dC++;
-		pts[dC].x = centreX - x;
-		pts[dC].y = centreY - y;
+		pts[dC].x = (float)(centreX - x);
+		pts[dC].y = (float)(centreY - y);
 		dC++;
-		pts[dC].x = centreX - x;
-		pts[dC].y = centreY + y;
+		pts[dC].x = (float)(centreX - x);
+		pts[dC].y = (float)(centreY + y);
 		dC++;
-		pts[dC].x = centreX + y;
-		pts[dC].y = centreY - x;
+		pts[dC].x = (float)(centreX + y);
+		pts[dC].y = (float)(centreY - x);
 		dC++;
-		pts[dC].x = centreX + y;
-		pts[dC].y = centreY + x;
+		pts[dC].x = (float)(centreX + y);
+		pts[dC].y = (float)(centreY + x);
 		dC++;
-		pts[dC].x = centreX - y;
-		pts[dC].y = centreY - x;
+		pts[dC].x = (float)(centreX - y);
+		pts[dC].y = (float)(centreY - x);
 		dC++;
-		pts[dC].x = centreX - y;
-		pts[dC].y = centreY + x;
+		pts[dC].x = (float)(centreX - y);
+		pts[dC].y = (float)(centreY + x);
 		dC++;
 
 		if (error <= 0) {
@@ -519,5 +523,5 @@ void sdl_render_circle(int32_t centreX, int32_t centreY, int32_t radius, uint32_
 
 	SDL_SetRenderDrawColor(
 	    sdlren, (Uint8)IGET_R(color), (Uint8)IGET_G(color), (Uint8)IGET_B(color), (Uint8)IGET_A(color));
-	SDL_RenderDrawPoints(sdlren, pts, (int)dC);
+	SDL_RenderPoints(sdlren, pts, (int)dC);
 }
